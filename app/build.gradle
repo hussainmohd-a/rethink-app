@@ -218,7 +218,7 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 
-    leakCanaryImplementation 'com.squareup.leakcanary:leakcanary-android:2.10'
+    leakCanaryImplementation 'com.squareup.leakcanary:leakcanary-android:2.12'
 
     fullImplementation 'androidx.navigation:navigation-fragment-ktx:2.5.3'
     fullImplementation 'androidx.navigation:navigation-ui-ktx:2.5.3'
