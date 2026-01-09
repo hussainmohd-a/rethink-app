@@ -30,11 +30,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
-import com.celzero.firestack.backend.Backend
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
 import com.celzero.bravedns.databinding.ActivityCheckoutProxyBinding
 import com.celzero.bravedns.service.EncryptedFileManager
+import com.celzero.bravedns.service.EncryptionException
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.TcpProxyHelper
 import com.celzero.bravedns.util.Themes
@@ -44,6 +44,7 @@ import com.celzero.bravedns.util.Utilities.togb
 import com.celzero.bravedns.util.Utilities.togs
 import com.celzero.bravedns.util.Utilities.tos
 import com.celzero.bravedns.util.handleFrostEffectIfNeeded
+import com.celzero.firestack.backend.Backend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -207,9 +208,14 @@ class CheckoutActivity : AppCompatActivity(R.layout.activity_checkout_proxy) {
                             File.separator +
                             TcpProxyHelper.PIP_KEY_FILE_NAME
                     )
-                EncryptedFileManager.writeTcpConfig(this, keyState.v().tos() ?: "", TcpProxyHelper.PIP_KEY_FILE_NAME)
-                val content = EncryptedFileManager.read(this, path)
-                Logger.d(Logger.LOG_TAG_PROXY, "Content: $content")
+                try {
+                    EncryptedFileManager.writeTcpConfig(this, keyState.v().tos() ?: "", TcpProxyHelper.PIP_KEY_FILE_NAME)
+                    val content = EncryptedFileManager.read(this, path)
+                    Logger.d(Logger.LOG_TAG_PROXY, "Content: $content")
+                } catch (e: EncryptionException) {
+                    Logger.e(Logger.LOG_TAG_PROXY, "Critical encryption failure in handleKeys", e)
+                    // EncryptionException already logged to event system by EncryptedFileManager
+                }
             } catch (e: Exception) {
                 Logger.e(Logger.LOG_TAG_PROXY, "err in handleKeys: ${e.message}", e)
             }

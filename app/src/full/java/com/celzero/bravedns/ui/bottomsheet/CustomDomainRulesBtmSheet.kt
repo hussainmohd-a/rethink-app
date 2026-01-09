@@ -19,9 +19,13 @@ import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.celzero.bravedns.R
 import com.celzero.bravedns.database.CustomDomain
+import com.celzero.bravedns.database.EventSource
+import com.celzero.bravedns.database.EventType
+import com.celzero.bravedns.database.Severity
 import com.celzero.bravedns.database.WgConfigFilesImmutable
 import com.celzero.bravedns.databinding.BottomSheetCustomDomainsBinding
 import com.celzero.bravedns.service.DomainRulesManager
+import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.FirewallManager
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.util.Constants.Companion.UID_EVERYBODY
@@ -29,10 +33,8 @@ import com.celzero.bravedns.util.Themes.Companion.getBottomsheetCurrentTheme
 import com.celzero.bravedns.util.UIUtils.fetchColor
 import com.celzero.bravedns.util.UIUtils.fetchToggleBtnColors
 import com.celzero.bravedns.util.Utilities
-import com.celzero.bravedns.util.Utilities.getDefaultIcon
 import com.celzero.bravedns.util.Utilities.isAtleastQ
 import com.celzero.bravedns.util.useTransparentNoDimBackground
-import com.celzero.bravedns.wireguard.Config
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
@@ -42,7 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 
-class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
+class CustomDomainRulesBtmSheet :
     BottomSheetDialogFragment(), ProxyCountriesBtmSheet.CountriesDismissListener, WireguardListBtmSheet.WireguardDismissListener {
     private var _binding: BottomSheetCustomDomainsBinding? = null
 
@@ -51,6 +53,9 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
         get() = _binding!!
 
     private val persistentState by inject<PersistentState>()
+    private val eventLogger by inject<EventLogger>()
+
+    private lateinit var cd: CustomDomain
 
     override fun getTheme(): Int =
         getBottomsheetCurrentTheme(isDarkThemeOn(), persistentState.theme)
@@ -62,6 +67,15 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
 
     companion object {
         private const val TAG = "CDRBtmSht"
+        private const val ARG_CUSTOM_DOMAIN = "custom_domain"
+
+        fun newInstance(customDomain: CustomDomain): CustomDomainRulesBtmSheet {
+            val fragment = CustomDomainRulesBtmSheet()
+            val args = Bundle()
+            args.putSerializable(ARG_CUSTOM_DOMAIN, customDomain)
+            fragment.arguments = args
+            return fragment
+        }
     }
 
     override fun onCreateView(
@@ -85,6 +99,15 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        // Retrieve CustomDomain from arguments
+        @Suppress("DEPRECATION")
+        cd = arguments?.getSerializable(ARG_CUSTOM_DOMAIN) as? CustomDomain ?: run {
+            Logger.e(LOG_TAG_UI, "$TAG CustomDomain not found in arguments, dismissing")
+            dismiss()
+            return
+        }
+
         dialog?.window?.let { window ->
             if (isAtleastQ()) {
                 val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -308,14 +331,17 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
 
     private suspend fun whitelist(cd: CustomDomain) {
         DomainRulesManager.trust(cd)
+        logEvent("Whitelisted custom domain rule for ${cd.domain}")
     }
 
     private suspend fun block(cd: CustomDomain) {
         DomainRulesManager.block(cd)
+        logEvent("Blocked custom domain rule for ${cd.domain}")
     }
 
     private suspend fun noRule(cd: CustomDomain) {
         DomainRulesManager.noRule(cd)
+        logEvent("Domain rule for ${cd.domain} is set to no rule")
     }
 
     private fun unselectToggleBtnUi(b: MaterialButton) {
@@ -343,6 +369,7 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
                 requireContext().getString(R.string.cd_toast_deleted),
                 Toast.LENGTH_SHORT
             )
+            logEvent("Deleted custom domain rule for ${cd.domain}")
             dismiss()
         }
 
@@ -489,6 +516,10 @@ class CustomDomainRulesBtmSheet(private var cd: CustomDomain) :
     override fun onDismiss(dialog: DialogInterface) {
         super.onDismiss(dialog)
         Logger.v(LOG_TAG_UI, "$TAG onDismiss; domain: ${cd.domain}")
+    }
+
+    private fun logEvent(details: String) {
+        eventLogger.log(EventType.FW_RULE_MODIFIED, Severity.LOW, "Custom Domain", EventSource.UI, false, details)
     }
 
 }

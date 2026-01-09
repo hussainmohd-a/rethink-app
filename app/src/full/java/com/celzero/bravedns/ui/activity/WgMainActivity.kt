@@ -17,6 +17,7 @@ package com.celzero.bravedns.ui.activity
 
 import Logger
 import Logger.LOG_TAG_PROXY
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
@@ -36,7 +37,11 @@ import com.celzero.bravedns.R
 import com.celzero.bravedns.adapter.OneWgConfigAdapter
 import com.celzero.bravedns.adapter.WgConfigAdapter
 import com.celzero.bravedns.data.AppConfig
+import com.celzero.bravedns.database.EventSource
+import com.celzero.bravedns.database.EventType
+import com.celzero.bravedns.database.Severity
 import com.celzero.bravedns.databinding.ActivityWireguardMainBinding
+import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.WireguardManager
 import com.celzero.bravedns.util.QrCodeFromFileScanner
@@ -64,6 +69,7 @@ class WgMainActivity :
     private val b by viewBinding(ActivityWireguardMainBinding::bind)
     private val persistentState by inject<PersistentState>()
     private val appConfig by inject<AppConfig>()
+    private val eventLogger by inject<EventLogger>()
 
     private var wgConfigAdapter: WgConfigAdapter? = null
     private var oneWgConfigAdapter: OneWgConfigAdapter? = null
@@ -95,6 +101,7 @@ class WgMainActivity :
                                     )
                                     Logger.e(LOG_TAG_PROXY, it.toString())
                                 }
+                                logEvent("Wireguard import", "imported from file")
                             }
                         } else {
                             val message =
@@ -147,6 +154,7 @@ class WgMainActivity :
                             Toast.LENGTH_LONG
                         )
                         Logger.e(LOG_TAG_PROXY, it.toString())
+                        logEvent("Wireguard import", "imported via QR scanner")
                     }
                 }
             }
@@ -226,7 +234,7 @@ class WgMainActivity :
         val layoutManager = LinearLayoutManager(this)
         b.wgGeneralInterfaceList.layoutManager = layoutManager
 
-        wgConfigAdapter = WgConfigAdapter(this, this, persistentState.splitDns)
+        wgConfigAdapter = WgConfigAdapter(this, this, persistentState.splitDns, eventLogger)
         wgConfigViewModel.interfaces.observe(this) { wgConfigAdapter?.submitData(lifecycle, it) }
         b.wgGeneralInterfaceList.adapter = wgConfigAdapter
     }
@@ -235,7 +243,7 @@ class WgMainActivity :
         val layoutManager = LinearLayoutManager(this)
         b.oneWgInterfaceList.layoutManager = layoutManager
 
-        oneWgConfigAdapter = OneWgConfigAdapter(this, this)
+        oneWgConfigAdapter = OneWgConfigAdapter(this, this, eventLogger)
         wgConfigViewModel.interfaces.observe(this) { oneWgConfigAdapter?.submitData(lifecycle, it) }
         b.oneWgInterfaceList.adapter = oneWgConfigAdapter
     }
@@ -331,15 +339,31 @@ class WgMainActivity :
             }
         }
         b.importFab.setOnClickListener {
-            tunnelFileImportResultLauncher.launch(IMPORT_LAUNCH_INPUT)
+            try {
+                tunnelFileImportResultLauncher.launch(IMPORT_LAUNCH_INPUT)
+            } catch (e: ActivityNotFoundException) {
+                Logger.e(LOG_TAG_PROXY, "err; anf; while launching file import: ${e.message}", e)
+                Utilities.showToastUiCentered(this, getString(R.string.blocklist_update_check_failure), Toast.LENGTH_SHORT)
+            } catch (e: Exception) {
+                Logger.e(LOG_TAG_PROXY, "err while launching file import: ${e.message}", e)
+                Utilities.showToastUiCentered(this, getString(R.string.blocklist_update_check_failure), Toast.LENGTH_SHORT)
+            }
         }
         b.qrCodeFab.setOnClickListener {
-            qrImportResultLauncher.launch(
-                ScanOptions()
-                    .setOrientationLocked(false)
-                    .setBeepEnabled(false)
-                    .setPrompt(resources.getString(R.string.lbl_qr_code))
-            )
+            try {
+                qrImportResultLauncher.launch(
+                    ScanOptions()
+                        .setOrientationLocked(false)
+                        .setBeepEnabled(false)
+                        .setPrompt(resources.getString(R.string.lbl_qr_code))
+                )
+            } catch (e: ActivityNotFoundException) {
+                Logger.e(LOG_TAG_PROXY, "err; anf while launching QR scanner: ${e.message}", e)
+                Utilities.showToastUiCentered(this, getString(R.string.blocklist_update_check_failure), Toast.LENGTH_SHORT)
+            } catch (e: Exception) {
+                Logger.e(LOG_TAG_PROXY, "err while launching QR scanner: ${e.message}", e)
+                Utilities.showToastUiCentered(this, getString(R.string.blocklist_update_check_failure), Toast.LENGTH_SHORT)
+            }
         }
         b.createFab.setOnClickListener { openTunnelEditorActivity() }
 
@@ -377,6 +401,10 @@ class WgMainActivity :
                 io {
                     if (WireguardManager.canDisableAllActiveConfigs()) {
                         WireguardManager.disableAllActiveConfigs()
+                        logEvent(
+                            "Wireguard disable",
+                            "all configs from toggle switch; isOneWgToggle: $isOneWgToggle"
+                        )
                         uiCtx {
                             this.observeDnsName()
                             if (isOneWgToggle) {
@@ -430,6 +458,10 @@ class WgMainActivity :
         b.createFab.visibility = View.GONE
         b.importFab.visibility = View.GONE
         b.qrCodeFab.visibility = View.GONE
+    }
+
+    private fun logEvent(msg: String, details: String) {
+        eventLogger.log(EventType.PROXY_SWITCH, Severity.LOW, msg, EventSource.UI, false, details)
     }
 
     private fun io(f: suspend () -> Unit) {

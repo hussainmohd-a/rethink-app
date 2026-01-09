@@ -316,6 +316,61 @@ interface StatsSummaryDao {
 
     @Query(
         """
+                       SELECT rl.uid as uid, 
+                                   rl.ipAddress as ipAddress,
+                                   0 as port,
+                                   COUNT(*) as count,
+                                   0 as blocked, 
+                                   rl.flag as flag,
+                                   asn.asName as appOrDnsName,
+                                   0 as downloadBytes,
+                                   0 as uploadBytes,
+                                   0 as totalBytes
+                               FROM RethinkLog as rl
+                               LEFT JOIN IpInfo as asn ON rl.ipAddress = asn.ip
+                               WHERE downloadBytes = 0
+                                   AND uploadBytes = 0
+                                   AND isBlocked = 0
+                                   AND duration = 0
+                                   AND synack = 0
+                                   AND message = ''
+                                   AND timeStamp >= :to
+                               GROUP BY ipAddress
+                               ORDER BY count DESC
+                       LIMIT 3
+                   """
+    )
+    fun getRethinkTopActiveConns(to: Long): PagingSource<Int, AppConnection>
+
+    @Query (
+        """
+                       SELECT rl.uid as uid, 
+                                   rl.ipAddress as ipAddress,
+                                   0 as port,
+                                   COUNT(*) as count,
+                                   0 as blocked, 
+                                   rl.flag as flag,
+                                   asn.asName as appOrDnsName,
+                                   0 as downloadBytes,
+                                   0 as uploadBytes,
+                                   0 as totalBytes
+                               FROM RethinkLog as rl
+                               LEFT JOIN IpInfo as asn ON rl.ipAddress = asn.ip
+                               WHERE downloadBytes = 0
+                                   AND uploadBytes = 0
+                                   AND isBlocked = 0
+                                   AND duration = 0
+                                   AND synack = 0
+                                   AND message = ''
+                                   AND timeStamp >= :to
+                               GROUP BY ipAddress
+                               ORDER BY count DESC
+                   """
+    )
+    fun getRethinkAllActiveConns(to: Long): PagingSource<Int, AppConnection>
+
+    @Query(
+        """
         SELECT ct.uid as uid, 
             ct.ipAddress as ipAddress,
             0 as port,
@@ -447,7 +502,10 @@ interface StatsSummaryDao {
               SUM(count) AS count, 
               '' as flag, 
               1 AS blocked, 
-              appOrDnsName 
+              appOrDnsName,
+              0 as downloadBytes,
+              0 as uploadBytes,
+              0 as totalBytes
             FROM 
               (
                 -- From DnsLogs
@@ -487,7 +545,10 @@ interface StatsSummaryDao {
               SUM(count) AS count, 
               '' as flag, 
               1 AS blocked, 
-              appOrDnsName 
+              appOrDnsName,
+              0 as downloadBytes,
+              0 as uploadBytes,
+              0 as totalBytes
             FROM 
               (
                 -- From DnsLogs
@@ -524,7 +585,10 @@ interface StatsSummaryDao {
             SUM(count) AS count, 
             flag, 
             1 AS blocked, 
-            appOrDnsName 
+            appOrDnsName,
+            0 as downloadBytes,
+            0 as uploadBytes,
+            0 as totalBytes
           FROM 
             (
               -- From DnsLogs
@@ -564,7 +628,10 @@ interface StatsSummaryDao {
               SUM(count) AS count, 
               flag, 
               1 AS blocked, 
-              appOrDnsName 
+              appOrDnsName,
+              0 as downloadBytes,
+              0 as uploadBytes,
+              0 as totalBytes
             FROM 
               (
                 -- From DnsLogs
@@ -604,7 +671,10 @@ interface StatsSummaryDao {
                 SUM(count) AS count, 
                 flag, 
                 0 AS blocked, 
-                appOrDnsName
+                appOrDnsName,
+                0 as downloadBytes,
+                0 as uploadBytes,
+                0 as totalBytes
             FROM (
                 -- From DnsLogs
                 SELECT RTRIM(queryStr, '.') AS appOrDnsName, 
@@ -644,7 +714,10 @@ interface StatsSummaryDao {
                 SUM(count) AS count, 
                 flag, 
                 0 AS blocked, 
-                appOrDnsName
+                appOrDnsName,
+                0 as downloadBytes,
+                0 as uploadBytes,
+                0 as totalBytes
             FROM (
                 -- From DnsLogs
                 SELECT RTRIM(queryStr, '.') AS appOrDnsName, 
@@ -683,7 +756,10 @@ interface StatsSummaryDao {
               SUM(count) AS count, 
               flag, 
               0 AS blocked, 
-              '' as appOrDnsName 
+              '' as appOrDnsName,
+              0 as downloadBytes,
+              0 as uploadBytes,
+              0 as totalBytes
             FROM 
               (
                 -- From DnsLogs
@@ -721,7 +797,10 @@ interface StatsSummaryDao {
               SUM(count) AS count, 
               flag, 
               0 AS blocked, 
-              '' as appOrDnsName 
+              '' as appOrDnsName,
+              0 as downloadBytes,
+              0 as uploadBytes,
+              0 as totalBytes
             FROM 
               (
                 -- From DnsLogs

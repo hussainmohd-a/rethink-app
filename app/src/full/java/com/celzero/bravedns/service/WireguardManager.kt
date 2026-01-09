@@ -19,22 +19,22 @@ import Logger
 import Logger.LOG_TAG_PROXY
 import android.content.Context
 import android.text.format.DateUtils
-import com.celzero.firestack.backend.Backend
 import com.celzero.bravedns.backup.BackupHelper.Companion.TEMP_WG_DIR
 import com.celzero.bravedns.data.AppConfig
 import com.celzero.bravedns.data.SsidItem
 import com.celzero.bravedns.database.WgConfigFiles
 import com.celzero.bravedns.database.WgConfigFilesImmutable
 import com.celzero.bravedns.database.WgConfigFilesRepository
+import com.celzero.bravedns.service.EncryptionException
 import com.celzero.bravedns.service.ProxyManager.ID_NONE
 import com.celzero.bravedns.service.ProxyManager.ID_WG_BASE
 import com.celzero.bravedns.util.Constants.Companion.WIREGUARD_FOLDER_NAME
-import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.wireguard.Config
 import com.celzero.bravedns.wireguard.Peer
 import com.celzero.bravedns.wireguard.WgHopManager
 import com.celzero.bravedns.wireguard.WgInterface
+import com.celzero.firestack.backend.Backend
 import com.celzero.firestack.backend.RouterStats
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +49,7 @@ object WireguardManager : KoinComponent {
     private val db: WgConfigFilesRepository by inject()
     private val applicationContext: Context by inject()
     private val appConfig: AppConfig by inject()
+    private val persistentState: PersistentState by inject()
 
     // 120 sec + 5 sec buffer
     const val WG_HANDSHAKE_TIMEOUT = 125 * DateUtils.SECOND_IN_MILLIS
@@ -97,8 +98,13 @@ object WireguardManager : KoinComponent {
         mappings = CopyOnWriteArraySet(m)
         mappings.forEach {
             val path = it.configPath
-            val config =
+            val config = try {
                 EncryptedFileManager.readWireguardConfig(applicationContext, path)
+            } catch (e: EncryptionException) {
+                // Critical encryption failure - config is unreadable
+                Logger.e(LOG_TAG_PROXY, "Critical encryption failure for wg config: $path, deleting config", e)
+                return@forEach
+            }
             if (config == null) {
                 Logger.e(LOG_TAG_PROXY, "err loading wg config: $path, invalid config")
                 // TODO: delete the warp config from the wireguard directory, now part of rpn proxy
@@ -229,7 +235,6 @@ object WireguardManager : KoinComponent {
                 map.serverResponse,
                 true,
                 map.isCatchAll,
-                map.isLockdown,
                 map.oneWireGuard,
                 map.useOnlyOnMetered,
                 map.isDeletable,
@@ -325,7 +330,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 false, // confirms with db.disableConfig query
                 m.isCatchAll,
-                m.isLockdown,
                 false, // confirms with db.disableConfig query
                 m.useOnlyOnMetered,
                 m.isDeletable,
@@ -347,7 +351,8 @@ object WireguardManager : KoinComponent {
     }
 
     // pair - first: proxyId, second - can proceed for next check
-    private suspend fun canUseConfig(idStr: String, type: String, usesMtrdNw: Boolean, ssid: String): Pair<String, Boolean> {
+    private fun canUseConfig(idStr: String, type: String, usesMtrdNw: Boolean, ssid: String): Pair<String, Boolean> {
+        val lockdown = persistentState.wgGlobalLockdown
         val block = Backend.Block
         if (idStr.isEmpty()) {
             return Pair("", true)
@@ -360,14 +365,14 @@ object WireguardManager : KoinComponent {
             return Pair("", true)
         }
 
-        if (config.isLockdown && (checkEligibilityBasedOnNw(id, usesMtrdNw) && checkEligibilityBasedOnSsid(id, ssid))) {
+        if (lockdown && (checkEligibilityBasedOnNw(id, usesMtrdNw) && checkEligibilityBasedOnSsid(id, ssid))) {
             Logger.d(LOG_TAG_PROXY, "lockdown wg for $type => return $idStr")
             return Pair(idStr, false) // no need to proceed further for lockdown
         }
 
         // in case of lockdown and not metered network, we need to return block as the
         // lockdown should not leak the connections via WiFi
-        if (config.isLockdown) {
+        if (lockdown) {
             // add IpnBlock instead of the config id, let the connection be blocked in WiFi
             // regardless of config is active or not
             Logger.d(LOG_TAG_PROXY, "lockdown wg for $type => return $block")
@@ -389,14 +394,15 @@ object WireguardManager : KoinComponent {
     }
 
     // no need to check for app excluded from proxy here, expected to call this fn after that
-    suspend fun getAllPossibleConfigIdsForApp(uid: Int, ip: String, port: Int, domain: String, usesMobileNw: Boolean, ssid: String, default: String): List<String> {
+    fun getAllPossibleConfigIdsForApp(uid: Int, ip: String, port: Int, domain: String, usesMobileNw: Boolean, ssid: String, default: String): List<String> {
+        val lockdown = persistentState.wgGlobalLockdown
         val block = Backend.Block
         val proxyIds: MutableList<String> = mutableListOf()
         if (oneWireGuardEnabled()) {
             val id = getOneWireGuardProxyId()
             if (id == null || id == INVALID_CONF_ID) {
                 Logger.e(LOG_TAG_PROXY, "canAdd: one-wg not found, id: $id, return empty")
-                return emptyList<String>()
+                return emptyList()
             }
 
             // commenting this as the one-wg is enabled for all networks no need to check for
@@ -531,16 +537,10 @@ object WireguardManager : KoinComponent {
             Logger.i(LOG_TAG_PROXY, "no proxy ids found for $uid, $ip, $port, $domain; returning $default")
             return listOf(default)
         }
-        // see if any id is part of lockdown, if so, then return the list, cac's can have lockdown
-        val isAnyIdLockdown = proxyIds.any { id ->
-            val confId = convertStringIdToId(id)
-            val conf = mappings.find { it.id == confId }
-            conf?.isLockdown ?: false
-        }
 
         // add the default proxy to the end, will not be true for lockdown but lockdown is handled
         // above, so no need to check here
-        if (default.isNotEmpty() && !isAnyIdLockdown) proxyIds.add(default)
+        if (default.isNotEmpty() && !lockdown) proxyIds.add(default)
 
         // the proxyIds list will contain the ip-app specific, domain-app specific, app specific,
         // universal ip, universal domain, catch-all and default configs in the order of priority
@@ -787,14 +787,6 @@ object WireguardManager : KoinComponent {
             disableConfig(cf)
         }
 
-        if (config == null) {
-            Logger.e(LOG_TAG_PROXY, "deleteConfig: wg not found, id: $id, ${configs.size}")
-            io {
-                db.deleteConfig(id)
-                mappings.remove(mappings.find { it.id == id })
-            }
-            return
-        }
         io {
             val fileName = getConfigFileName(id)
             val file = File(getConfigFilePath(), fileName)
@@ -806,41 +798,8 @@ object WireguardManager : KoinComponent {
             val proxyId = ID_WG_BASE + id
             ProxyManager.removeProxyId(proxyId)
             mappings.remove(mappings.find { it.id == id })
-            configs.remove(config)
+            if (config != null) configs.remove(config)
             WgHopManager.handleWgDelete(id)
-        }
-    }
-
-    suspend fun updateLockdownConfig(id: Int, isLockdown: Boolean) {
-        val config = configs.find { it.getId() == id }
-        val map = mappings.find { it.id == id }
-        if (config == null) {
-            Logger.e(LOG_TAG_PROXY, "updateLockdownConfig: wg not found, id: $id, ${configs.size}")
-            return
-        }
-        Logger.i(LOG_TAG_PROXY, "updating lockdown for config: $id, ${config.getPeers()}")
-        db.updateLockdownConfig(id, isLockdown)
-        val m = mappings.find { it.id == id } ?: return
-        mappings.remove(m)
-        mappings.add(
-            WgConfigFilesImmutable(
-                id,
-                config.getName(),
-                m.configPath,
-                m.serverResponse,
-                m.isActive,
-                m.isCatchAll,
-                isLockdown, // just updating lockdown field
-                m.oneWireGuard,
-                m.useOnlyOnMetered,
-                m.isDeletable,
-                m.ssidEnabled,
-                m.ssids
-            )
-        )
-        if (map?.isActive == true) {
-            VpnController.addWireGuardProxy(id = ID_WG_BASE + config.getId())
-            VpnController.notifyConnectionMonitor()
         }
     }
 
@@ -862,7 +821,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 m.isActive,
                 isEnabled, // just updating catch all field
-                m.isLockdown,
                 m.oneWireGuard,
                 m.useOnlyOnMetered,
                 m.isDeletable,
@@ -892,7 +850,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 m.isActive,
                 m.isCatchAll,
-                m.isLockdown,
                 owg, // updating just one wireguard field
                 m.useOnlyOnMetered,
                 m.isDeletable,
@@ -920,7 +877,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 m.isActive,
                 m.isCatchAll,
-                m.isLockdown,
                 m.oneWireGuard,
                 useMobileNw, // just updating useMobileNw
                 m.isDeletable,
@@ -959,7 +915,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 m.isActive,
                 m.isCatchAll,
-                m.isLockdown,
                 m.oneWireGuard,
                 m.useOnlyOnMetered,
                 m.isDeletable,
@@ -995,7 +950,6 @@ object WireguardManager : KoinComponent {
                 m.serverResponse,
                 m.isActive,
                 m.isCatchAll,
-                m.isLockdown,
                 m.oneWireGuard,
                 m.useOnlyOnMetered,
                 m.isDeletable,
@@ -1077,7 +1031,13 @@ object WireguardManager : KoinComponent {
         // write the contents to the encrypted file
         val parsedCfg = cfg.toWgQuickString()
         val fileName = getConfigFileName(cfg.getId())
-        EncryptedFileManager.writeWireguardConfig(applicationContext, parsedCfg, fileName)
+        try {
+            EncryptedFileManager.writeWireguardConfig(applicationContext, parsedCfg, fileName)
+        } catch (e: EncryptionException) {
+            // Critical encryption failure - cannot save config
+            Logger.e(LOG_TAG_PROXY, "Critical encryption failure writing wg config: ${cfg.getId()}", e)
+            throw e // Bubble up to caller
+        }
         val path = getConfigFilePath() + fileName
         Logger.i(LOG_TAG_PROXY, "writing wg config to file: $path")
         val file = db.isConfigAdded(cfg.getId())
@@ -1090,7 +1050,6 @@ object WireguardManager : KoinComponent {
                     serverResponse,
                     isActive = false,
                     isCatchAll = false,
-                    isLockdown = false,
                     oneWireGuard = false,
                     useOnlyOnMetered = false,
                     isDeletable = true,
@@ -1127,7 +1086,6 @@ object WireguardManager : KoinComponent {
                     serverResponse,
                     isActive = false,
                     isCatchAll = false,
-                    isLockdown = false,
                     oneWireGuard = false,
                     isDeletable = true,
                     useOnlyOnMetered = false,
@@ -1150,7 +1108,7 @@ object WireguardManager : KoinComponent {
             val stats = VpnController.getWireGuardStats(id)
             val routerStats = stats?.routerStats
             sb.append("   id: ${it.id}, name: ${it.name}\n")
-            sb.append("   addr: ${routerStats?.addr}").append("\n")
+            sb.append("   addr: ${routerStats?.addrs}").append("\n")
             sb.append("   mtu: ${stats?.mtu}\n")
             sb.append("   status: ${stats?.status}\n")
             sb.append("   ip4: ${stats?.ip4}\n")
@@ -1164,10 +1122,11 @@ object WireguardManager : KoinComponent {
             sb.append("   lastOk: ${getRelativeTimeSpan(routerStats?.lastOK)}\n")
             sb.append("   since: ${getRelativeTimeSpan(routerStats?.since)}\n")
             sb.append("   errRx: ${routerStats?.errRx}\n")
-            sb.append("   errTx: ${routerStats?.errTx}\n\n")
+            sb.append("   errTx: ${routerStats?.errTx}\n")
+            sb.append("   extra: ${routerStats?.extra}\n\n")
         }
         if (sb.isEmpty()) {
-            sb.append("   N/A")
+            sb.append("   N/A\n\n")
         }
         return sb.toString()
     }
@@ -1224,17 +1183,38 @@ object WireguardManager : KoinComponent {
             // read the contents of the file and write it to the EncryptedFileManager
             val bytes = file.readBytes()
             val encryptFile = File(c.configPath)
-            if (!encryptFile.exists()) {
-                encryptFile.parentFile?.mkdirs()
-                encryptFile.createNewFile()
-            }
-            val res = EncryptedFileManager.write(applicationContext, bytes, encryptFile)
-            if (res) {
-                Logger.i(LOG_TAG_PROXY, "restored wg config: ${c.id}, ${c.name}")
-            } else {
-                Logger.e(LOG_TAG_PROXY, "err restoring wg config: ${c.id}, ${c.name}")
-                // in case of error, delete the entry from the database
+            val parentDir = encryptFile.parentFile
+            if (parentDir == null) {
+                Logger.e(LOG_TAG_PROXY, "wg restore failed, invalid path: ${c.configPath}")
                 db.deleteConfig(c.id)
+                return@forEach
+            }
+            if (!parentDir.exists() && !parentDir.mkdirs()) {
+                Logger.e(LOG_TAG_PROXY, "wg restore failed, unable to create dir: ${parentDir.absolutePath}")
+                db.deleteConfig(c.id)
+                return@forEach
+            }
+            val created = runCatching {
+                if (!encryptFile.exists()) {
+                    encryptFile.createNewFile()
+                } else {
+                    true
+                }
+            }.getOrElse { ex ->
+                Logger.w(LOG_TAG_PROXY, "wg restore failed, unable to create file: ${encryptFile.absolutePath}, err: ${ex.message}")
+                db.deleteConfig(c.id)
+                return@forEach
+            }
+            if (!created) {
+                Logger.e(LOG_TAG_PROXY, "wg restore failed, createNewFile returned false: ${encryptFile.absolutePath}")
+                db.deleteConfig(c.id)
+                return@forEach
+            }
+            try {
+                EncryptedFileManager.write(applicationContext, bytes, encryptFile)
+                Logger.i(LOG_TAG_PROXY, "restored wg config: ${c.id}, ${c.name}")
+            } catch (e: EncryptionException) {
+                Logger.e(LOG_TAG_PROXY, "Critical encryption failure restoring wg config: ${c.id}, ${c.name}", e)
             }
         }
 
