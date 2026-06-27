@@ -841,24 +841,10 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
         if (persistentState.routeRethinkInRethink) {
             b.genRInRDesc.text = getString(R.string.settings_rinr_desc_enabled)
             disableBandwidthBoosterUi()
-            disableProxyLockdownUi()
         } else {
             b.genRInRDesc.text = getString(R.string.settings_rinr_desc_disabled)
             enableBandwidthBoosterUi()
-            enableProxyLockdownUi()
         }
-    }
-
-    private fun disableProxyLockdownUi() {
-        b.dvWgLockdownRl.alpha = ALPHA_DISABLED
-        b.dvWgLockdownSwitch.isEnabled = false
-        b.dvWgLockdownRl.isEnabled = false
-    }
-
-    private fun enableProxyLockdownUi() {
-        b.dvWgLockdownRl.alpha = ALPHA_ENABLED
-        b.dvWgLockdownSwitch.isEnabled = true
-        b.dvWgLockdownRl.isEnabled = true
     }
 
     private fun disableBandwidthBoosterUi() {
