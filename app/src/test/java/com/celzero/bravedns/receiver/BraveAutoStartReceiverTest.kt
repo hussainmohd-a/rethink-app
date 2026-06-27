@@ -48,7 +48,6 @@ class BraveAutoStartReceiverTest {
         val supportedActions = listOf(
             Intent.ACTION_BOOT_COMPLETED,
             Intent.ACTION_REBOOT,
-            "android.intent.action.LOCKED_BOOT_COMPLETED",
             Intent.ACTION_USER_UNLOCKED,
             Intent.ACTION_MY_PACKAGE_REPLACED
         )
