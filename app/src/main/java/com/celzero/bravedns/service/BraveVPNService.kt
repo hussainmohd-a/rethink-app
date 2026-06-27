@@ -413,27 +413,14 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         val curnet = underlyingNetworks
         val exiting = who == Backend.Exit
         val proxying = ProxyManager.isAnyUserSetProxy(who)
-        var doNotProtect = !exiting
-        val ignoreProxy = true
+        val doNotProtect = !exiting
 
         logd("bind: who: $who, addr: $addrPort, fd: $fid, rinr? $rinr, exit? $exiting, proxying? $proxying")
         if (doNotProtect && rinr) {
-            if (!ignoreProxy) { // remove this setting when needed
-                val doProxyRethink =
-                    !(FirewallManager.getAppInfoByUid(rethinkUid)?.isProxyExcluded ?: false)
-                if (doProxyRethink) {
-                    // let user set proxy proceed to protect & bind, as rethink is not bypassing proxies
-                    // do not proceed if rethink is bypassed and proxyId(who) is not user-set proxy
-                    // or Exit, this includes Base or any other go related proxies
-                    doNotProtect = !proxying
-                }
-            }
-            if (doNotProtect) {
-                // do not proceed if rethink within rethink is enabled and proxyId(who) is not exit
-                Logger.vv(LOG_TAG_VPN, "bind: rinr, within rethink, who: $who, fd: $fid, addr: $addrPort")
-                Logger.vv(LOG_TAG_VPN, "bindAny: execution time: ${elapsedRealtime() - startTime} ms (rinr skip exit)")
-                return
-            }
+            // do not proceed if rethink within rethink is enabled and proxyId(who) is not exit
+            Logger.vv(LOG_TAG_VPN, "bind: rinr, within rethink, who: $who, fd: $fid, addr: $addrPort")
+            Logger.vv(LOG_TAG_VPN, "bindAny: execution time: ${elapsedRealtime() - startTime} ms (rinr skip exit)")
+            return
         }
 
         this.protect(fid.toInt())
@@ -625,26 +612,13 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         val exiting = who == Backend.Exit
         val proxying = ProxyManager.isAnyUserSetProxy(who)
         var doNotProtect = !exiting
-        val ignoreProxy = true
 
         logd("bind: who: $who, addr: fd: $fd, rinr? $rinr, exit? $exiting, proxying? $proxying")
         if (doNotProtect && rinr) {
-            if (!ignoreProxy) { // remove this setting when needed
-                val doProxyRethink =
-                    !(FirewallManager.getAppInfoByUid(rethinkUid)?.isProxyExcluded ?: false)
-                if (doProxyRethink) {
-                    // let user set proxy proceed to protect & bind, as rethink is not bypassing proxies
-                    // do not proceed if rethink is bypassed and proxyId(who) is not user-set proxy
-                    // or Exit, this includes Base or any other go related proxies
-                    doNotProtect = !proxying
-                }
-            }
-            if (doNotProtect) {
-                // do not proceed if rethink within rethink is enabled and proxyId(who) is not exit
-                Logger.vv(LOG_TAG_VPN, "protect: rinr, within rethink, who: $who, fd: $fd")
-                Logger.vv(LOG_TAG_VPN, "protect (who): execution time: ${elapsedRealtime() - startTime} ms (rinr skip exit)")
-                return@go2kt
-            }
+            // do not proceed if rethink within rethink is enabled and proxyId(who) is not exit
+            Logger.vv(LOG_TAG_VPN, "protect: rinr, within rethink, who: $who, fd: $fd")
+            Logger.vv(LOG_TAG_VPN, "protect (who): execution time: ${elapsedRealtime() - startTime} ms (rinr skip exit)")
+            return@go2kt
         }
         this.protect(fd.toInt())
         Logger.vv(LOG_TAG_VPN, "protect (who): execution time: ${elapsedRealtime() - startTime} ms, who: $who, fd: $fd")
@@ -6530,6 +6504,15 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
     private fun handleFirewallBubbleIfNeeded() {
         if (!persistentState.firewallBubbleEnabled) {
             Logger.w(TAG, "Bubble disabled by user")
+            unobserveBubbleBlockedConns()
+            BubbleHelper.dismissBubble(this)
+            return
+        }
+
+        // A notification (and therefore a bubble) cannot be shown without the
+        // POST_NOTIFICATIONS permission on Android 13+. Treat it the same as disabled.
+        if (!BubbleHelper.isNotificationPermissionGranted(this)) {
+            Logger.w(TAG, "Notification permission not granted; not showing bubble")
             unobserveBubbleBlockedConns()
             BubbleHelper.dismissBubble(this)
             return
