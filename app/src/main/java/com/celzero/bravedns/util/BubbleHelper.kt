@@ -17,15 +17,18 @@ package com.celzero.bravedns.util
 
 import Logger
 import Logger.LOG_TAG_FIREWALL
+import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -157,6 +160,11 @@ object BubbleHelper {
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     fun createBubbleShortcut(context: Context) {
+        if (isBubbleShortcutExists(context)) {
+            Logger.v(LOG_TAG_FIREWALL, "Bubble shortcut already exists")
+            return
+        }
+
         val shortcutIntent = Intent(context, BubbleActivity::class.java).apply {
             action = Intent.ACTION_VIEW
         }
@@ -181,12 +189,46 @@ object BubbleHelper {
         Logger.i(LOG_TAG_FIREWALL, "Bubble shortcut created")
     }
 
+    private fun isBubbleShortcutExists(context: Context): Boolean {
+        return try {
+            ShortcutManagerCompat.getDynamicShortcuts(context).any { it.id == BUBBLE_SHORTCUT_ID }
+        } catch (e: Exception) {
+            Logger.w(LOG_TAG_FIREWALL, "Unable to query dynamic shortcuts: ${e.message}")
+            false
+        }
+    }
+
+    fun isNotificationPermissionGranted(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+
+    private fun buildBubbleDeletePendingIntent(context: Context): PendingIntent {
+        return PendingIntent.getBroadcast(
+            context,
+            4,
+            Intent(context, com.celzero.bravedns.receiver.BubbleDismissReceiver::class.java).apply {
+                action = com.celzero.bravedns.receiver.BubbleDismissReceiver.ACTION_BUBBLE_DISMISSED
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
     /**
      * Show the bubble notification.
      *
      * IMPORTANT (platform contract): A bubble is always backed by a notification.
      * If you don't want to see anything in the notification shade, use
      * BubbleMetadata#setSuppressNotification(true).
+     *
+     * @return true if the bubble was shown (system allows bubbles), false otherwise.
+     *         When false, a one-time fallback notification is posted so the user can
+     *         navigate to system settings and enable bubbles. That notification is
+     *         dismissed as soon as the user accepts/declines the permission.
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     fun showBubble(context: Context, persistentState: PersistentState? = null): Boolean {
@@ -198,6 +240,14 @@ object BubbleHelper {
                     Logger.i(LOG_TAG_FIREWALL, "Bubble feature disabled in settings (not supported)")
                 }
             }
+            return false
+        }
+
+        // Android 13+ requires the POST_NOTIFICATIONS permission to show any notification,
+        // including bubbles. The UI is responsible for requesting the permission; here we
+        // just refuse to post if it is missing.
+        if (!isNotificationPermissionGranted(context)) {
+            Logger.w(LOG_TAG_FIREWALL, "Notification permission not granted; cannot show bubble")
             return false
         }
 
@@ -228,14 +278,18 @@ object BubbleHelper {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val deleteIntent = buildBubbleDeletePendingIntent(context)
+
+        // When eligible, hide the backing notification from the shade so only the bubble is
+        // visible. On Android 10 the platform ignores suppression, so a shade entry is
+        // unavoidable there; we still make it dismissible via the delete intent.
         val bubbleData = NotificationCompat.BubbleMetadata.Builder(
             bubblePendingIntent,
             bubbleIcon(context)
         )
             .setDesiredHeight(600)
             .setAutoExpandBubble(false)
-            // Hide the notification in the shade when bubble is available.
-            .setSuppressNotification(true)
+            .setSuppressNotification(eligible)
             .build()
 
         val messagingStyle = NotificationCompat.MessagingStyle(
@@ -245,8 +299,16 @@ object BubbleHelper {
                 .build()
         ).setConversationTitle(context.getString(R.string.firewall_bubble_title))
 
+        // Use a different message text when the notification is a fallback prompt
+        // rather than an actual bubble.
+        val messageText = if (eligible) {
+            context.getString(R.string.firewall_bubble_text)
+        } else {
+            context.getString(R.string.firewall_bubble_enable_prompt_text)
+        }
+
         messagingStyle.addMessage(
-            context.getString(R.string.firewall_bubble_text),
+            messageText,
             System.currentTimeMillis(),
             androidx.core.app.Person.Builder().setName(context.getString(R.string.app_name)).build()
         )
@@ -254,48 +316,54 @@ object BubbleHelper {
         val builder = NotificationCompat.Builder(context, BUBBLE_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_icon)
             .setContentTitle(context.getString(R.string.firewall_bubble_title))
-            .setContentText(context.getString(R.string.firewall_bubble_text))
+            .setContentText(messageText)
             .setStyle(messagingStyle)
             .setShortcutId(BUBBLE_SHORTCUT_ID)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setShowWhen(true)
-            .setContentIntent(bubblePendingIntent)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .addAction(0, "Disable", disableIntent)
             .setBubbleMetadata(bubbleData)
 
-        // If not eligible, the system will not bubble. Provide a direct route to the correct
-        // settings surface. We do NOT want a normal notification in that state, but without
-        // an on-screen affordance the user can't fix it. This action is the minimal compliant UX.
-        if (!eligible) {
-            builder.addAction(0, "Enable bubbles", buildEnableBubblesPendingIntent(context))
-            // Do NOT suppress the notification if it can't bubble, otherwise user sees nothing
-            // and can't reach settings.
-            val bubbleDataUnsuppressed = NotificationCompat.BubbleMetadata.Builder(
-                bubblePendingIntent,
-                bubbleIcon(context)
+        if (eligible) {
+            // Actual bubble: content opens BubbleActivity, swipe/delete disables feature.
+            builder.setContentIntent(bubblePendingIntent)
+            builder.setDeleteIntent(deleteIntent)
+            builder.addAction(0, context.getString(R.string.firewall_bubble_action_disable), disableIntent)
+        } else {
+            // Fallback prompt: content + "Enable bubbles" action open settings.
+            // No delete intent — swiping just dismisses the notification without disabling.
+            val enableBubblesPendingIntent = buildEnableBubblesPendingIntent(context)
+            builder.setContentIntent(enableBubblesPendingIntent)
+            builder.addAction(
+                0,
+                context.getString(R.string.firewall_bubble_action_enable_bubbles),
+                enableBubblesPendingIntent
             )
-                .setDesiredHeight(600)
-                .setAutoExpandBubble(false)
-                .setSuppressNotification(false)
-                .build()
-            builder.setBubbleMetadata(bubbleDataUnsuppressed)
         }
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(BUBBLE_NOTIFICATION_ID, builder.build())
+        try {
+            nm.notify(BUBBLE_NOTIFICATION_ID, builder.build())
+        } catch (e: SecurityException) {
+            Logger.e(LOG_TAG_FIREWALL, "SecurityException posting bubble notification: ${e.message}", e)
+            return false
+        }
 
         Logger.i(LOG_TAG_FIREWALL, "Bubble notification posted (eligible=$eligible)")
         return eligible
     }
 
     /**
-     * Update the bubble notification with current blocked apps count
-     * This updates the notification message to show current blocked apps count
+     * Update the bubble notification with current blocked apps count.
      *
-     * @param persistentState Optional PersistentState to disable bubble if not allowed
+     * This is called by the VPN service while the bubble is active. If the bubble
+     * notification is no longer active (e.g. the user swiped it away) or if the
+     * system has become ineligible, we stop updating rather than resurrecting a
+     * stale notification.
+     *
+     * @param persistentState Optional PersistentState to disable bubble if not supported
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     fun updateBubble(
@@ -315,9 +383,16 @@ object BubbleHelper {
                 return
             }
 
-            // Do not auto-disable the feature if bubbles are not allowed.
-            // User explicitly wants bubble-only UX; if system disallows, we just can't show it.
-            // Keep the toggle state unchanged.
+            if (!isNotificationPermissionGranted(context)) {
+                Logger.w(LOG_TAG_FIREWALL, "Notification permission not granted; cannot update bubble")
+                return
+            }
+
+            if (!isBubbleEligible(context)) {
+                Logger.w(LOG_TAG_FIREWALL, "Bubble no longer eligible; stopping updates")
+                dismissBubble(context)
+                return
+            }
 
             val bubbleIntent = Intent(context, BubbleActivity::class.java).apply {
                 action = Intent.ACTION_VIEW
@@ -381,7 +456,8 @@ object BubbleHelper {
                 .setAutoCancel(false)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setOnlyAlertOnce(true)
-                .addAction(0, "Disable", disableIntent)
+                .setDeleteIntent(buildBubbleDeletePendingIntent(context))
+                .addAction(0, context.getString(R.string.firewall_bubble_action_disable), disableIntent)
                 .build()
 
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -390,6 +466,7 @@ object BubbleHelper {
             Logger.e(LOG_TAG_FIREWALL, "Error updating bubble: ${e.message}", e)
         }
     }
+
 
     /**
      * Dismiss the bubble notification
@@ -494,28 +571,6 @@ object BubbleHelper {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun buildBubbleSettingsIntent(context: Context): Intent {
-        // Prefer the system's dedicated bubble settings surface when available.
-        // On Android 12+ this takes the user to: App notifications -> Bubbles.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val bubbleIntent = Intent(Settings.ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS).apply {
-                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            if (bubbleIntent.resolveActivity(context.packageManager) != null) {
-                return bubbleIntent
-            }
-        }
-
-        // Android 10/11: best available is channel settings; bubble toggle lives there.
-        return Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
-            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-            putExtra(Settings.EXTRA_CHANNEL_ID, BUBBLE_CHANNEL_ID)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    }
-
     /**
      * NOTE: Do NOT start settings Activities from a background context/service.
      * That violates modern background launch limits and causes "random" navigation.
@@ -523,7 +578,7 @@ object BubbleHelper {
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     fun buildEnableBubblesPendingIntent(context: Context): PendingIntent {
-        val intent = buildBubbleSettingsIntent(context).apply {
+        val intent = buildEnableBubblesIntent(context).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         return PendingIntent.getActivity(
@@ -535,13 +590,45 @@ object BubbleHelper {
     }
 
     /**
-     * Intent to open the best available system UI to enable bubbles.
-     * - Android 12+: App notification bubble settings (global per-app bubble toggle)
-     * - Android 10/11: Channel notification settings (channel-level "Allow bubbles")
+     * Opens the system settings page responsible for blocking bubbles.
+     *
+     * On Android 12+:
+     *   - If bubbles are globally disabled → open ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS
+     *   - If the channel doesn't allow bubbles or importance < HIGH → open channel settings
+     * On Android 10/11 → always channel settings (the only surface with bubble toggle + importance)
      */
     @RequiresApi(Build.VERSION_CODES.Q)
     fun buildEnableBubblesIntent(context: Context): Intent {
-        return buildBubbleSettingsIntent(context)
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = nm.getNotificationChannel(BUBBLE_CHANNEL_ID)
+
+        // Android 12+: if global bubbles are disabled, open the per-app bubble settings page.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            @Suppress("DEPRECATION")
+            if (!nm.areBubblesAllowed()) {
+                return Intent(Settings.ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS).apply {
+                    putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+            }
+        }
+
+        // If the channel doesn't allow bubbles or its importance is too low,
+        // open the channel notification settings (has both "Allow bubbles" and importance).
+        if (channel == null || !channel.canBubble() || channel.importance < NotificationManager.IMPORTANCE_HIGH) {
+            return Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                putExtra(Settings.EXTRA_CHANNEL_ID, BUBBLE_CHANNEL_ID)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+
+        // Fallback (shouldn't reach here if called when ineligible).
+        return Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            putExtra(Settings.EXTRA_CHANNEL_ID, BUBBLE_CHANNEL_ID)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)

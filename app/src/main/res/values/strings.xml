@@ -1974,6 +1974,12 @@
     <string name="firewall_bubble_text" translatable="false">Tap to view recently blocked apps</string>
     <string name="firewall_bubble_permission_granted_toast" translatable="false">Firewall Bubble enabled</string>
     <string name="firewall_bubble_permission_denied_toast" translatable="false">Permission denied. Firewall Bubble disabled.</string>
+    <string name="firewall_bubble_action_disable" translatable="false">Disable</string>
+    <string name="firewall_bubble_action_enable_bubbles" translatable="false">Enable bubbles</string>
+    <string name="firewall_bubble_notification_permission_toast" translatable="false">Notification permission is required for the Firewall Bubble</string>
+    <string name="firewall_bubble_vpn_off_toast" translatable="false">Firewall Bubble will appear when the VPN is running</string>
+    <string name="firewall_bubble_not_allowed_toast" translatable="false">Bubbles are not allowed. Enable them in system settings to use this feature.</string>
+    <string name="firewall_bubble_enable_prompt_text" translatable="false">Tap to enable bubbles in system settings</string>
 
     <string name="bubble_activity_title" translatable="false">Recently Blocked Apps</string>
     <string name="bubble_empty_state_title" translatable="false">No Blocked Apps</string>

@@ -63,6 +63,7 @@ import com.celzero.bravedns.databinding.ActivityMiscSettingsBinding
 import com.celzero.bravedns.net.go.GoVpnAdapter
 import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.PersistentState
+import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.BaseActivity
 import com.celzero.bravedns.ui.LauncherSwitcher
 import com.celzero.bravedns.ui.activity.AppLockActivity.Companion.APP_LOCK_ALIAS
@@ -112,8 +113,9 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
     private val eventLogger by inject<EventLogger>()
 
     private var isThemeChanged: Boolean = false
+    private var isHandlingBubbleToggle: Boolean = false
     private lateinit var notificationPermissionResult: ActivityResultLauncher<String>
-    private lateinit var bubbleSettingsResult: ActivityResultLauncher<Intent>
+    private lateinit var bubbleNotificationPermissionResult: ActivityResultLauncher<String>
 
     enum class BioMetricType(val action: Int, val mins: Long) {
         OFF(BIOMETRIC_ACTION_OFF, BIOMETRIC_MINS_OFF),
@@ -705,6 +707,7 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
         }
 
         b.settingsFirewallBubbleRl.setOnClickListener {
+            enableAfterDelay(CLICK_DELAY_SHORT_MS, b.settingsFirewallBubbleRl)
             b.settingsFirewallBubbleSwitch.isChecked = !b.settingsFirewallBubbleSwitch.isChecked
         }
 
@@ -734,37 +737,62 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun handleFirewallBubbleToggle(isChecked: Boolean) {
+        if (isHandlingBubbleToggle) return
+        isHandlingBubbleToggle = true
+
         if (isChecked) {
-            // Enable bubble
-            persistentState.firewallBubbleEnabled = true
-
-            // Ensure channel/shortcut exist.
-            BubbleHelper.createBubbleNotificationChannel(this)
-            BubbleHelper.createBubbleShortcut(this)
-
-            // If not eligible, take user to bubble settings page.
-            if (!BubbleHelper.isBubbleEligible(this)) {
-                try {
-                    bubbleSettingsResult.launch(BubbleHelper.buildEnableBubblesIntent(this))
-                } catch (e: Exception) {
-                    Logger.w(LOG_TAG_UI, "err launching bubble settings: ${e.message}")
-                    invokeAndroidNotificationSetting()
-                }
-                logEvent("Firewall bubble enabled (needs user to allow bubbles)")
-                return
-            }
-
-            // Eligible: request bubble now.
-            BubbleHelper.showBubble(this)
-            logEvent("Firewall bubble enabled")
+            enableFirewallBubble()
         } else {
-            // Disable bubble - reset all bubble state for clean re-initialization
-            persistentState.firewallBubbleEnabled = false
-
-            BubbleHelper.resetBubbleState(this)
-
-            logEvent("Firewall bubble disabled")
+            disableFirewallBubble()
         }
+
+        isHandlingBubbleToggle = false
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun enableFirewallBubble() {
+        // Persist the user's intent first; the switch already reflects it.
+        persistentState.firewallBubbleEnabled = true
+
+        // Android 13+ requires a notification permission to show any notification, including
+        // bubbles. Request it if missing.
+        if (isAtleastT() && !isNotificationPermissionGranted()) {
+            try {
+                bubbleNotificationPermissionResult.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } catch (e: ActivityNotFoundException) {
+                Logger.e(LOG_TAG_UI, "ActivityNotFoundException requesting notification permission: ${e.message}", e)
+                invokeAndroidNotificationSetting()
+            } catch (e: Exception) {
+                Logger.e(LOG_TAG_UI, "err requesting notification permission: ${e.message}", e)
+            }
+            showToastUiCentered(
+                this,
+                getString(R.string.firewall_bubble_notification_permission_toast),
+                Toast.LENGTH_LONG
+            )
+            logEvent("Firewall bubble notification permission requested")
+            return
+        }
+
+        // Show the bubble now if the VPN is running. If bubbles are not allowed by the
+        // system, showBubble() posts a fallback notification with an "Enable bubbles" action.
+        if (VpnController.hasTunnel()) {
+            BubbleHelper.showBubble(this, persistentState)
+        } else {
+            showToastUiCentered(
+                this,
+                getString(R.string.firewall_bubble_vpn_off_toast),
+                Toast.LENGTH_SHORT
+            )
+        }
+        logEvent("Firewall bubble enabled")
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun disableFirewallBubble() {
+        persistentState.firewallBubbleEnabled = false
+        BubbleHelper.resetBubbleState(this)
+        logEvent("Firewall bubble disabled")
     }
 
     private fun showGoLoggerDialog() {
@@ -1187,19 +1215,24 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
         // app notification permission android 13
         showEnableNotificationSettingIfNeeded()
 
-        // If user enabled bubble toggle, re-check eligibility after coming back from Settings.
-        if (isAtleastQ() && persistentState.firewallBubbleEnabled) {
-            try {
-                if (BubbleHelper.isBubbleEligible(this)) {
-                    BubbleHelper.showBubble(this)
+        // Keep the bubble switch in sync with the persisted intent. This matters when
+        // the bubble is dismissed via the notification (which flips the persisted flag
+        // from a BroadcastReceiver) or when the user returns from system settings.
+        if (isAtleastQ()) {
+            b.settingsFirewallBubbleSwitch.isChecked = persistentState.firewallBubbleEnabled
+
+            // If the user enabled bubbles in system settings while away, make sure the
+            // bubble is actually shown (or the fallback is upgraded to a real bubble).
+            if (persistentState.firewallBubbleEnabled && BubbleHelper.isBubbleEligible(this)) {
+                if (VpnController.hasTunnel()) {
+                    BubbleHelper.showBubble(this, persistentState)
                 }
-            } catch (_: Exception) {
             }
         }
     }
 
     private fun registerForActivityResult() {
-        // Sets up permissions request launcher.
+        // Sets up permissions request launcher for the generic app-notification switch.
         notificationPermissionResult =
             registerForActivityResult(ActivityResultContracts.RequestPermission()) {
                 persistentState.shouldRequestNotificationPermission = it
@@ -1216,22 +1249,37 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
                 logEvent("Notification permission granted: $it")
             }
 
-        // Launcher for bubble channel settings.
-        bubbleSettingsResult =
-            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-                // User may have toggled "Allow bubbles". Re-check and request bubble if eligible.
-                if (!isAtleastQ()) return@registerForActivityResult
-
-                if (!persistentState.firewallBubbleEnabled) return@registerForActivityResult
-
-                try {
-                    if (BubbleHelper.isBubbleEligible(this)) {
-                        BubbleHelper.showBubble(this)
+        // Permission request launcher used exclusively by the firewall bubble toggle.
+        bubbleNotificationPermissionResult =
+            registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) {
+                    Logger.i(LOG_TAG_UI, "Notification permission granted for bubble")
+                    persistentState.firewallBubbleEnabled = true
+                    if (isAtleastQ()) {
+                        if (VpnController.hasTunnel()) {
+                            BubbleHelper.showBubble(this, persistentState)
+                        } else {
+                            showToastUiCentered(
+                                this,
+                                getString(R.string.firewall_bubble_vpn_off_toast),
+                                Toast.LENGTH_SHORT
+                            )
+                        }
                     }
-                } catch (e: Exception) {
-                    Logger.w(LOG_TAG_UI, "err after bubble settings return: ${e.message}")
+                    logEvent("Firewall bubble notification permission granted")
+                } else {
+                    Logger.w(LOG_TAG_UI, "Notification permission denied for bubble")
+                    persistentState.firewallBubbleEnabled = false
+                    b.settingsFirewallBubbleSwitch.isChecked = false
+                    showToastUiCentered(
+                        this,
+                        getString(R.string.firewall_bubble_notification_permission_toast),
+                        Toast.LENGTH_LONG
+                    )
+                    logEvent("Firewall bubble notification permission denied")
                 }
             }
+
     }
 
     private fun invokeNotificationPermission() {
