@@ -66,6 +66,8 @@ def getVersionCode = {
     return code
 }
 
+def appVersionCode = getVersionCode()
+
 try {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 } catch (Exception ex) {
@@ -286,6 +288,9 @@ android {
             // for build type alpha, versionCode is set in env overriding gradle.properties
             versionCode = getVersionCode()
             versionName = gitVersion
+            // add base version code to the build config, so that if there is override of
+            // version numbers by some builds (because of split apks)
+            buildConfigField "int", "BASE_VERSION_CODE", String.valueOf(appVersionCode)
             vectorDrawables.useSupportLibrary = true
         }
     }

@@ -1244,6 +1244,7 @@ internal constructor(
 
     fun stats(): String {
         val sb = StringBuilder()
+        sb.append("   App version: ${persistentState.appVersion}\n")
         sb.append("   Brave mode: ${getBraveMode()}\n")
         sb.append("   DNS type: ${getDnsType()}\n")
         sb.append("   Proxy type: ${ProxyType.of(getProxyType()).name}\n")

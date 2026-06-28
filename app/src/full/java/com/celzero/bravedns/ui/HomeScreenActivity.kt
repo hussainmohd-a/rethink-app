@@ -439,17 +439,8 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
     }
 
     private fun getLatestVersion(): Int {
-        val pInfo: PackageInfo? = getPackageMetadata(this.packageManager, this.packageName)
-        // TODO: modify this to use the latest version code api
-        @Suppress("DEPRECATION")
-        val v = pInfo?.versionCode ?: 0
-        // latest version has apk variant (baseAbiVersionCode * 10000000 + variant.versionCode)
-        // so we need to mod the version code by 10000000 to get the actual version code
-        // for example: 10000000 + 45 = 10000045, so the version code is 1
-        // see build.gradle (:app), #project.ext.versionCodes
-        val latestVersionCode = v % 10000000 // 10000000 is the base version code
-        Logger.i(LOG_TAG_UI, "latest version code: $latestVersionCode")
-        return latestVersionCode
+        Logger.i(LOG_TAG_UI, "base version code: ${BuildConfig.BASE_VERSION_CODE}")
+        return BuildConfig.BASE_VERSION_CODE
     }
 
     // FIXME - Move it to Android's built-in WorkManager
