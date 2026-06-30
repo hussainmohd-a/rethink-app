@@ -168,6 +168,8 @@ class DnsLogAdapter(val context: Context, val loadFavIcon: Boolean, val isRethin
             b.dnsQueryType.text = log.typeName
         }
 
+        // always called after #displayTransactionDetails(), as there is check of the values which
+        // are updated as part of displayTransactionDetails method.
         private fun displayUnicodeIfNeeded(log: DnsLog) {
             if (DEBUG) {
                 val msg = log.msg.split(";").firstOrNull() ?: ""
@@ -264,7 +266,7 @@ class DnsLogAdapter(val context: Context, val loadFavIcon: Boolean, val isRethin
                 }
             }
 
-            if (b.dnsUnicodeHint.text.isEmpty() && b.dnsQueryType.text.isEmpty()) {
+            if (b.dnsUnicodeHint.text.isEmpty() && b.dnsQueryType.text.isEmpty() && b.dnsLatency.text.isEmpty()) {
                 b.dnsSummaryLl.visibility = View.GONE
             } else {
                 b.dnsSummaryLl.visibility = View.VISIBLE
