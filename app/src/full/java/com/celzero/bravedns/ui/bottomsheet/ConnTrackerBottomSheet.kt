@@ -305,7 +305,7 @@ class ConnTrackerBottomSheet : BottomSheetDialogFragment(), KoinComponent {
         b.bsConnConnTypeSecondary.visibility = View.GONE
         // show connId and message if the log level is less than DEBUG
         if (Logger.LoggerLevel.fromId(persistentState.goLoggerLevel.toInt())
-                ?.isLessThan(Logger.LoggerLevel.DEBUG) == true
+                ?.isLessThanOrEqualTo(Logger.LoggerLevel.DEBUG) == true
         ) {
             b.connectionMessage.text = "${info?.proxyDetails}; ${info?.rpid}; ${info?.connId}; ${info?.message}; ${info?.synack}"
         } else {
@@ -324,12 +324,22 @@ class ConnTrackerBottomSheet : BottomSheetDialogFragment(), KoinComponent {
                             getString(R.string.symbol_green_circle)
                         )
                 } else {
-                    b.bsConnConnDuration.text =
-                        getString(
-                            R.string.two_argument_space,
-                            getString(R.string.symbol_hyphen),
-                            getString(R.string.symbol_clock)
-                        )
+                    val duration = UIUtils.getDurationInHumanReadableFormat(requireContext(), info?.duration ?: 0)
+                    if (duration.isEmpty()) {
+                        b.bsConnConnDuration.text =
+                            getString(
+                                R.string.two_argument_space,
+                                getString(R.string.symbol_hyphen),
+                                getString(R.string.symbol_clock)
+                            )
+                    } else {
+                        b.bsConnConnDuration.text =
+                            getString(
+                                R.string.two_argument_space,
+                                duration,
+                                getString(R.string.symbol_clock)
+                            )
+                    }
                 }
             }
         }
@@ -377,9 +387,6 @@ class ConnTrackerBottomSheet : BottomSheetDialogFragment(), KoinComponent {
 
         b.bsConnConnUpload.text = uploadBytes
         b.bsConnConnDownload.text = downloadBytes
-        val duration = UIUtils.getDurationInHumanReadableFormat(requireContext(), info?.duration ?: 0)
-        b.bsConnConnDuration.text =
-            getString(R.string.two_argument_space, duration, getString(R.string.symbol_clock))
     }
 
     private fun lightenUpChip() {
