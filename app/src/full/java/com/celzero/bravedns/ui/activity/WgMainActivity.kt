@@ -76,13 +76,21 @@ class WgMainActivity :
     private val wgConfigViewModel: WgConfigViewModel by viewModel()
 
     companion object {
-        private const val IMPORT_LAUNCH_INPUT = "*/*"
+        private val IMPORT_LAUNCH_INPUT = arrayOf("*/*")
     }
 
     private val tunnelFileImportResultLauncher =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { data ->
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { data ->
             if (data == null) return@registerForActivityResult
             val contentResolver = contentResolver ?: return@registerForActivityResult
+            try {
+                contentResolver.takePersistableUriPermission(
+                    data,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            } catch (e: SecurityException) {
+                Logger.w(LOG_TAG_PROXY, "Could not persist URI permission for $data", e)
+            }
             lifecycleScope.launch {
                 if (QrCodeFromFileScanner.validContentType(contentResolver, data)) {
                     try {
