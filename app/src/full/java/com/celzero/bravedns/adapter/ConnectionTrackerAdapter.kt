@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.celzero.bravedns.R
+import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
 import com.celzero.bravedns.database.ConnectionTracker
 import com.celzero.bravedns.databinding.ListItemConnTrackBinding
 import com.celzero.bravedns.service.FirewallManager
@@ -45,6 +46,7 @@ import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.bottomsheet.ConnTrackerBottomSheet
 import com.celzero.bravedns.util.Constants.Companion.EMPTY_PACKAGE_NAME
 import com.celzero.bravedns.util.Constants.Companion.TIME_FORMAT_1
+import com.celzero.bravedns.util.Constants.Companion.TIME_FORMAT_5
 import com.celzero.bravedns.util.KnownPorts
 import com.celzero.bravedns.util.Protocol
 import com.celzero.bravedns.util.UIUtils
@@ -165,7 +167,11 @@ class ConnectionTrackerAdapter(private val context: Context) :
         }
 
         private fun displayTransactionDetails(connTracker: ConnectionTracker) {
-            val time = Utilities.convertLongToTime(connTracker.timeStamp, TIME_FORMAT_1)
+            val time = if (DEBUG) {
+                Utilities.convertLongToTime(connTracker.timeStamp, TIME_FORMAT_5)
+            } else {
+                Utilities.convertLongToTime(connTracker.timeStamp, TIME_FORMAT_1)
+            }
             b.connectionResponseTime.text = time
             b.connectionFlag.text = connTracker.flag
 
