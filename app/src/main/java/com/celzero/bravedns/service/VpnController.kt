@@ -376,7 +376,7 @@ object VpnController : KoinComponent {
         return braveVpnService?.getSystemDns().orEmpty()
     }
 
-    fun getNetStat(): NetStat? {
+    suspend fun getNetStat(): NetStat? {
         return braveVpnService?.getNetStat()
     }
 

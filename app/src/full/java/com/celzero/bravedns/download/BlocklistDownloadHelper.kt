@@ -112,9 +112,9 @@ class BlocklistDownloadHelper {
             if (!dir.exists()) return
 
             dir.listFiles()?.forEach {
-                logd("delete blocklist list residue for $which, dir: ${it.name}")
+                logd("delete blocklist list residue for $which, skipping: ${it.name}")
                 // delete all the dir other than current timestamp dir
-                if (it.name != timestamp.toString()) {
+                if (it.absolutePath.contains(timestamp.toString())) {
                     deleteRecursive(it)
                 }
             }

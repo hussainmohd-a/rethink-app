@@ -126,7 +126,7 @@ object EncryptedFileManager : KoinComponent {
             details = details
         )
 
-        Logger.e(LOG_TAG, "$message - ${cryptoException.message}", e)
+        Logger.e(LOG_TAG, "$message: ${cryptoException.message}")
         return cryptoException
     }
 
