@@ -26,7 +26,6 @@ import com.celzero.bravedns.database.WgConfigFiles
 import com.celzero.bravedns.database.WgConfigFilesImmutable
 import com.celzero.bravedns.database.WgConfigFilesRepository
 import com.celzero.bravedns.service.ProxyManager.ID_WG_BASE
-import com.celzero.bravedns.service.WireguardManager.load
 import com.celzero.bravedns.util.Constants.Companion.WIREGUARD_FOLDER_NAME
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.wireguard.Config
@@ -481,43 +480,45 @@ object WireguardManager : KoinComponent {
     }
 
     // pair - first: proxyId, second - can proceed for next check
-    private fun canUseConfig(idStr: String, type: String, usesMobileNw: Boolean, ssid: String): Pair<String, Boolean> {
-        val block = Backend.Block
+    private fun canUseConfig(idStr: String, type: String, usesMobileNw: Boolean, ssid: String): Boolean {
         if (idStr.isEmpty()) {
-            return Pair("", true)
+            return false
         }
         val id = convertStringIdToId(idStr)
         val config = if (id == INVALID_CONF_ID) null else mappings.find { it.id == id }
 
         if (config == null) {
             Logger.d(LOG_TAG_PROXY, "config null($idStr) no need to proceed, return empty")
-            return Pair("", true)
+            return false
         }
 
         val lockdown = config.isLockdown
 
         if (lockdown && isEligibleForNetwork(id, usesMobileNw, ssid, config.useOnlyOnMetered, config.ssidEnabled)) {
             Logger.d(LOG_TAG_PROXY, "lockdown wg for $type => return $idStr")
-            return Pair(idStr, false) // no need to proceed further for lockdown
-        }
-
-        // in case of lockdown and not metered network, we need to return block as the
-        // lockdown should not leak the connections via WiFi
-        if (lockdown) {
-            // add IpnBlock instead of the config id, let the connection be blocked in WiFi
-            // regardless of config is active or not
-            Logger.d(LOG_TAG_PROXY, "lockdown wg for $type => return $block")
-            return Pair(block, false) // no need to proceed further for lockdown
+            return true // no need to proceed further for lockdown
         }
 
         // check if the config is active and if it can be used on this network
         if (config.isActive && isEligibleForNetwork(id, usesMobileNw, ssid, config.useOnlyOnMetered, config.ssidEnabled)) {
             Logger.d(LOG_TAG_PROXY, "active wg for $type => add $idStr")
-            return Pair(idStr, true)
+            return true
         }
 
         Logger.v(LOG_TAG_PROXY, "wg for $type not active or not eligible nw, return empty, for id: $idStr, usesMtrdNw: $usesMobileNw, ssid: $ssid")
-        return Pair("", true)
+        return false
+    }
+
+    private fun isAnyProxyLockdown(proxies: List<String>): Boolean {
+        var lockdown = false
+        proxies.forEach { it ->
+            val confId = convertStringIdToId(it)
+            val conf = mappings.find { it.id == confId }
+            lockdown = conf?.isLockdown ?: false
+            if (lockdown) return true
+        }
+
+        return lockdown
     }
 
     // no need to check for app excluded from proxy here, expected to call this fn after that
@@ -532,19 +533,6 @@ object WireguardManager : KoinComponent {
                 return emptyList()
             }
 
-            // commenting this as the one-wg is enabled for all networks no need to check for
-            // mobile network, uncomment this when the one-wg can have mobile only option
-            /*if (checkEligibilityBasedOnNw(id, usesMeteredNw)) {
-                proxyIds.add(ID_WG_BASE + id)
-                // add default to the list, can route check is done in go-tun
-                if (default.isNotEmpty()) proxyIds.add(default)
-                Logger.i(LOG_TAG_PROXY, "one-wg enabled, return $proxyIds")
-                return proxyIds
-            } else {
-                // fall-through as one-wg is enabled only for metered networks
-                // for now the setting doesn't allow user to set the one-wg to mobile networks
-                // so this case is not expected
-            }*/
             proxyIds.add(ID_WG_BASE + id)
             // add default to the list, can route check is done in go-tun
             // let one-wg use wg-dns no need to add the default to the list
@@ -553,45 +541,6 @@ object WireguardManager : KoinComponent {
             return proxyIds
         }
 
-        /* TODO: commenting the code as v055o doesn't use ip-app specific and domain-app specific
-        // rules
-        // check for ip-app specific config first
-        // returns Pair<String, String> - first is ProxyId, second is CC
-        val ipc = IpRulesManager.hasProxy(uid, ip, port)
-        // return Pair<String, Boolean> - first is ProxyId, second is can proceed for next check
-        // one case where second parameter is true when the config is in lockdown mode
-        val ipcProxyPair = canUseConfig(ipc.first, "ip($ip:$port)", usesMeteredNw)
-        if (!ipcProxyPair.second) { // false denotes first is not empty
-            if (ipcProxyPair.first == block) {
-                proxyIds.clear()
-                proxyIds.add(block)
-            } else {
-                proxyIds.add(ipcProxyPair.first)
-            }
-            Logger.i(LOG_TAG_PROXY, "lockdown wg for ip($ip:$port) => return $proxyIds")
-            return proxyIds
-        }
-        // add the ip-app specific config to the list
-        if (ipc.first.isNotEmpty()) proxyIds.add(ipc.first) // ip-app specific
-
-        // check for domain-app specific config
-        val dc = DomainRulesManager.getProxyForDomain(uid, domain)
-        val dcProxyPair = canUseConfig(dc.first, "domain($domain)", usesMeteredNw)
-        if (!dcProxyPair.second) {
-            if (ipcProxyPair.first == block) {
-                proxyIds.clear()
-                proxyIds.add(block)
-            } else {
-                proxyIds.add(ipcProxyPair.first)
-            }
-            Logger.i(LOG_TAG_PROXY, "lockdown wg for domain($domain) => return $proxyIds")
-            return proxyIds
-        }
-        // add the domain-app specific config to the list
-        if (dcProxyPair.first.isNotEmpty()) proxyIds.add(dcProxyPair.first) // domain-app specific
-        */
-
-        // --- App-specific WireGuard configs (multi-proxy aware) ---
         // collect all proxy-ids for this uid and keep only WireGuard ones (wgX)
         val allProxyIdsForApp = ProxyManager.getProxyIdsForApp(uid)
         val wgProxyIdsForApp = allProxyIdsForApp.filter { it.startsWith(ID_WG_BASE) }
@@ -599,59 +548,18 @@ object WireguardManager : KoinComponent {
         // app-specific configs may be empty if the app is not configured
         if (wgProxyIdsForApp.isNotEmpty()) {
             for (pid in wgProxyIdsForApp) {
-                val appProxyPair = canUseConfig(pid, "app($uid)", usesMobileNw, ssid)
-                if (!appProxyPair.second) {
-                    // lockdown or block; honor it and stop further processing
-                    proxyIds.clear()
-                    if (appProxyPair.first == block) {
-                        proxyIds.add(block)
-                    } else if (appProxyPair.first.isNotEmpty()) {
-                        proxyIds.add(appProxyPair.first)
-                    }
-                    Logger.i(LOG_TAG_PROXY, "lockdown wg for app($uid) => return $proxyIds")
-                    return proxyIds
-                }
-                if (appProxyPair.first.isNotEmpty()) {
-                    // add eligible app-specific config in the order we see them
-                    proxyIds.add(appProxyPair.first)
+                val canUse = canUseConfig(pid, "app($uid)", usesMobileNw, ssid)
+                if (canUse) {
+                    proxyIds.add(pid)
                 }
             }
         }
 
-        /* TODO: commenting the code as v055o doesn't use universal ip and domain rules
-        // check for universal ip config
-        val uipc = IpRulesManager.hasProxy(UID_EVERYBODY, ip, port)
-        val uipcProxyPair = canUseConfig(uipc.first, "univ-ip($ip:$port)", usesMeteredNw)
-        if (!uipcProxyPair.second) {
-            if (ipcProxyPair.first == block) {
-                proxyIds.clear()
-                proxyIds.add(block)
-            } else {
-                proxyIds.add(ipcProxyPair.first)
-            }
-            Logger.i(LOG_TAG_PROXY, "lockdown wg for univ-ip($ip:$port) => return $proxyIds")
-            return proxyIds // no need to proceed further for lockdown
+        // if any of the chosen proxy is lockdown, then no need to proceed further
+        if (isAnyProxyLockdown(proxyIds)) {
+            Logger.i(LOG_TAG_PROXY, "lockdown wg for app($uid) => return $proxyIds")
+            return proxyIds
         }
-
-        // add the universal ip config to the list
-        if (uipcProxyPair.first.isNotEmpty()) proxyIds.add(uipcProxyPair.first) // universal ip
-
-        // check for universal domain config
-        val udc = DomainRulesManager.getProxyForDomain(UID_EVERYBODY, domain)
-        val udcProxyPair = canUseConfig(udc.first, "univ-dom($domain)", usesMeteredNw)
-        if (!udcProxyPair.second) {
-            if (ipcProxyPair.first == block) {
-                proxyIds.clear()
-                proxyIds.add(block)
-            } else {
-                proxyIds.add(ipcProxyPair.first)
-            }
-            Logger.i(LOG_TAG_PROXY, "lockdown wg for univ-dom($domain) => return $proxyIds")
-            return proxyIds // no need to proceed further for lockdown
-        }
-
-        // add the universal domain config to the list
-        if (udcProxyPair.first.isNotEmpty()) proxyIds.add(udcProxyPair.first)*/
 
         // once the app-specific config is added, check if any catch-all config is enabled
         // if catch-all config is enabled, then add the config id to the list
@@ -889,6 +797,7 @@ object WireguardManager : KoinComponent {
         allIds.forEach { id ->
             deleteConfig(id)
         }
+        appConfig.removeAllProxies()
     }
 
     suspend fun updateLockdownConfig(id: Int, isLockdown: Boolean) {
@@ -1252,6 +1161,8 @@ object WireguardManager : KoinComponent {
             sb.append("   lastRxErr: ${routerStats?.lastRxErr}\n")
             sb.append("   lastTxErr: ${routerStats?.lastTxErr}\n")
             sb.append("   lastOk: ${getRelativeTimeSpan(routerStats?.lastOK)}\n")
+            sb.append("   lastOpen: ${getRelativeTimeSpan(routerStats?.lastOpen)}\n")
+            sb.append("   hdl: ${routerStats?.hdl}\n")
             sb.append("   since: ${getRelativeTimeSpan(routerStats?.since)}\n")
             sb.append("   errRx: ${routerStats?.errRx}\n")
             sb.append("   errTx: ${routerStats?.errTx}\n")
