@@ -209,12 +209,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     val text = persistentState.firebaseUserToken
+                    val ctx = context ?: return false
                     val clipboard =
-                        getSystemService(requireContext(), ClipboardManager::class.java)
+                        getSystemService(ctx, ClipboardManager::class.java)
                     val clip = ClipData.newPlainText("token", text)
                     clipboard?.setPrimaryClip(clip)
 
-                    Toast.makeText(requireContext(), "Copied to clipboard", Toast.LENGTH_SHORT)
+                    Toast.makeText(ctx, "Copied to clipboard", Toast.LENGTH_SHORT)
                         .show()
                     return true
                 }
@@ -224,8 +225,9 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
 
                     val newToken = generateNewToken()
                     b.tokenTextView.text = newToken
+                    val ctx = context ?: return true
                     Toast.makeText(
-                        requireContext(),
+                        ctx,
                         getString(R.string.config_add_success_toast),
                         Toast.LENGTH_SHORT
                     ).show()
@@ -273,7 +275,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun getLastUpdatedTs(): String {
-        val pInfo: PackageInfo? = getPackageMetadata(requireContext().packageManager, requireContext().packageName)
+        val ctx = context ?: return ""
+        val pInfo: PackageInfo? = getPackageMetadata(ctx.packageManager, ctx.packageName)
         // TODO: modify this to use the latest version code api
         val updatedTs = pInfo?.lastUpdateTime ?: return ""
         return if (updatedTs > 0) {
@@ -307,14 +310,16 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun getVersionName(): String {
+        val ctx = context ?: return ""
         val pInfo: PackageInfo? =
-            getPackageMetadata(requireContext().packageManager, requireContext().packageName)
+            getPackageMetadata(ctx.packageManager, ctx.packageName)
         return pInfo?.versionName ?: ""
     }
 
     private fun getSponsorInfo(): String {
-        val installTime = requireContext().packageManager.getPackageInfo(
-            requireContext().packageName,
+        val ctx = context ?: return ""
+        val installTime = ctx.packageManager.getPackageInfo(
+            ctx.packageName,
             0
         ).firstInstallTime
         val timeDiff = System.currentTimeMillis() - installTime
@@ -476,7 +481,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
 
     private fun enableTestMode() {
         persistentState.appTestMode = true
-        showToastUiCentered(requireContext(), "Test mode enabled", Toast.LENGTH_SHORT)
+        val ctx = context ?: return
+        showToastUiCentered(ctx, "Test mode enabled", Toast.LENGTH_SHORT)
         Logger.i(LOG_TAG_UI, "Test mode enabled")
         logEvent(EventType.UI_TOGGLE, "Test mode enabled", "User enabled test mode")
     }
@@ -666,7 +672,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
 
                 val tv = android.widget.TextView(ctx).apply {
                     setPadding(pad, pad / 2, pad, pad)
-                    text = stats.ifEmpty { requireContext().getString(R.string.lbl_not_available_short) }
+                    text = stats.ifEmpty { ctx.getString(R.string.lbl_not_available_short) }
                     setTextIsSelectable(true)
                     typeface = android.graphics.Typeface.MONOSPACE
                     textSize = 11.5f
@@ -681,7 +687,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
                     .setView(scrollView)
                     .setPositiveButton(R.string.fapps_info_dialog_positive_btn) { d, _ -> d.dismiss() }
                     .setNeutralButton(R.string.dns_info_neutral) { _, _ ->
-                        copyToClipboard("stats_dump", stats.orEmpty())
+                        copyToClipboard("stats_dump", stats)
                         showToastUiCentered(
                             ctx,
                             getString(R.string.copied_clipboard),
@@ -690,7 +696,12 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
                     }.create()
                     .show()
             }
-            printSysEnvAndProps()
+        }
+        // printSysEnvAndProps() is debug-only and slow (reflective OsConstants
+        // iteration + many Os.sysconf calls). Run it on its own coroutine so
+        // it never blocks the dialog flow or starves the shared IO dispatcher.
+        if (DEBUG) {
+            io { printSysEnvAndProps() }
         }
     }
 
@@ -715,7 +726,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             val auxv = KernelProc.getStats(forceRefresh = true)
             val stat = GoVpnAdapter.getGoMetrics()
             val formatedMetrics = UIUtils.formatNetMetrics(stat)
-            val memMetrics = MemoryUtils.getMemoryStats(requireContext())
+            val ctx = context
+            val memMetrics = if (ctx != null) MemoryUtils.getMemoryStats(ctx) else ""
             uiCtx {
                 if (!isAdded) return@uiCtx
                 showProcDialog(allThreadsSched, status, smaps, auxv, formatedMetrics, memMetrics)
@@ -1144,7 +1156,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
      * @return true if at least one log file exists, false otherwise
      */
     private fun hasAnyLogsAvailable(): Boolean {
-        val dir = requireContext().filesDir
+        val ctx = context ?: return false
+        val dir = ctx.filesDir
 
         val bugReportZip = File(getZipFileName(dir))
         if (bugReportZip.exists() && bugReportZip.length() > 0) {
@@ -1152,7 +1165,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         if (isAtleastO()) {
-            val tombstoneZip = EnhancedBugReport.getTombstoneZipFile(requireContext())
+            val tombstoneZip = EnhancedBugReport.getTombstoneZipFile(ctx)
             if (tombstoneZip != null && tombstoneZip.exists() && tombstoneZip.length() > 0) {
                 return true
             }
@@ -1189,7 +1202,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun openNotificationSettings() {
-        val packageName = requireContext().packageName
+        val ctx = context ?: return
+        val packageName = ctx.packageName
         try {
             val intent = Intent()
             if (isAtleastO()) {
@@ -1203,7 +1217,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             showToastUiCentered(
-                requireContext(),
+                ctx,
                 getString(R.string.notification_screen_error),
                 Toast.LENGTH_SHORT
             )
@@ -1269,11 +1283,12 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun promptCrashLogAction() {
+        val ctx = context ?: return
         // ensure tombstone logs are added to zip if available
         if (isAtleastO()) {
             io {
                 try {
-                    EnhancedBugReport.addLogsToZipFile(requireContext())
+                    EnhancedBugReport.addLogsToZipFile(ctx)
                 } catch (e: Exception) {
                     Logger.w(LOG_TAG_UI, "err adding tombstone to zip: ${e.message}", e)
                 }
@@ -1281,13 +1296,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         // see if bug report files exist
-        val dir = requireContext().filesDir
+        val dir = ctx.filesDir
         val zipPath = getZipFileName(dir)
         val zipFile = File(zipPath)
 
         if (!zipFile.exists() || zipFile.length() <= 0) {
             showToastUiCentered(
-                requireContext(),
+                ctx,
                 getString(R.string.log_file_not_available),
                 Toast.LENGTH_SHORT
             )
@@ -1300,13 +1315,14 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun handleShowAppExitInfo() {
-        if (WorkScheduler.isWorkRunning(requireContext(), WorkScheduler.APP_EXIT_INFO_JOB_TAG))
+        val ctx = context ?: return
+        if (WorkScheduler.isWorkRunning(ctx, WorkScheduler.APP_EXIT_INFO_JOB_TAG))
             return
 
         workScheduler.scheduleOneTimeWorkForAppExitInfo()
         showBugReportProgressUi()
 
-        val workManager = WorkManager.getInstance(requireContext().applicationContext)
+        val workManager = WorkManager.getInstance(ctx.applicationContext)
         workManager.getWorkInfosByTagLiveData(WorkScheduler.APP_EXIT_INFO_ONE_TIME_JOB_TAG).observe(
             viewLifecycleOwner
         ) { workInfoList ->
@@ -1332,8 +1348,9 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun onAppExitInfoFailure() {
+        val ctx = context ?: return
         showToastUiCentered(
-            requireContext(),
+            ctx,
             getString(R.string.log_file_not_available),
             Toast.LENGTH_SHORT
         )
