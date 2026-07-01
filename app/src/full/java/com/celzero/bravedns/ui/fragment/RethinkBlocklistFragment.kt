@@ -151,6 +151,17 @@ class RethinkBlocklistFragment :
         fun getSelectedFileTags(): Set<Int> {
             return selectedFileTags.value ?: emptySet()
         }
+
+        // base64 stamp: appears as a URL path segment, e.g. https://max.rethinkdns.com/1:IAAgAA==
+        // anchored with / before and end-of-string/. / ? / # after so it can't match mid-path
+        private val BASE64_STAMP_REGEX =
+            Pattern.compile("/1:([A-Za-z0-9+/=]+)(?:[.?#]|$)")
+
+        // base32 stamp: appears as a subdomain prefix, e.g. //1-acaabaa.max.rethinkdns.com
+        // or 1-acaabaa.max.rethinkdns.com (bare); an optional subdomain (max/sky) sits
+        // between the stamp and .rethinkdns.com
+        private val BASE32_STAMP_REGEX =
+            Pattern.compile("(?:^|//)1-([a-z2-7]+)(?:\\.[^/]+)?\\.rethinkdns\\.com")
     }
 
     override fun onCreateView(
@@ -659,37 +670,38 @@ class RethinkBlocklistFragment :
     }
 
     private fun isRethinkStampSearch(t: String): Boolean {
+        Logger.vv(LOG_TAG_UI, "isRethinkStampSearch: $t")
         // do not proceed if rethinkdns.com is not available
-        if (!t.contains(Constants.RETHINKDNS_DOMAIN)) return false
-
-        val split = t.split("/")
-
-        // split: https://max.rethinkdns.com/1:IAAgAA== [https:, , max.rethinkdns.com, 1:IAAgAA==]
-        split.forEach {
-            if (it.contains("$RETHINK_STAMP_VERSION:") && isBase64(it)) {
-                io { processSelectedFileTags(it) }
-                showToastUiCentered(requireContext(), "Blocklists restored", Toast.LENGTH_SHORT)
-                return true
-            }
+        if (!t.contains(Constants.RETHINKDNS_DOMAIN)) {
+            Logger.d(LOG_TAG_UI, "rethinkdns.com is not available")
+            return false
         }
 
-        return false
+        val stamp = extractStamp(t) ?: return false
+
+        io { processSelectedFileTags(stamp) }
+        showToastUiCentered(requireContext(), "Blocklists restored", Toast.LENGTH_SHORT)
+        return true
     }
 
-    // ref: netflix/msl/util/Base64
-    private fun isBase64(stamp: String): Boolean {
-        val whitespaceRegex = "\\s"
-        val pattern =
-            Pattern.compile(
-                "^([A-Za-z0-9+/]{4})*([A-Za-z0-9+/]{4}|[A-Za-z0-9+/]{3}=|[A-Za-z0-9+/]{2}==)?$"
-            )
+    private fun extractStamp(t: String): String? {
+        Logger.vv(LOG_TAG_UI, "extractStamp: $t")
+        // format 1: https://max.rethinkdns.com/1:IAAgAA== (base64 after ":")
+        // format 2: //1-acaabaa.max.rethinkdns.com (base32 after "-")
+        val base64Match = BASE64_STAMP_REGEX.matcher(t)
+        if (base64Match.find()) {
+            Logger.d(LOG_TAG_UI, "extract base64 stamp: ${base64Match.group(1)}")
+            return "$RETHINK_STAMP_VERSION:${base64Match.group(1)}"
+        }
 
-        val versionSplit = stamp.split(":").getOrNull(1) ?: return false
+        val base32Match = BASE32_STAMP_REGEX.matcher(t)
+        if (base32Match.find()) {
+            Logger.d(LOG_TAG_UI, "extract base32 stamp: ${base32Match.group(1)}")
+            return "$RETHINK_STAMP_VERSION-${base32Match.group(1)}"
+        }
 
-        if (versionSplit.isEmpty()) return false
-
-        val result = versionSplit.replace(whitespaceRegex, "")
-        return pattern.matcher(result).matches()
+        Logger.d(LOG_TAG_UI, "extract stamp failed for $t")
+        return null
     }
 
     fun filterObserver(): MutableLiveData<Filters> {
