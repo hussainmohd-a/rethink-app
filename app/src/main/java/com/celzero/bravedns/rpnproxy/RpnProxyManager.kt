@@ -57,6 +57,8 @@ import com.celzero.bravedns.util.Constants.Companion.RPN_PROXY_FOLDER_NAME
 import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.Utilities
 import com.celzero.firestack.backend.Backend
+import com.celzero.firestack.backend.IPMetadata
+import com.celzero.firestack.backend.RouterStats
 import com.celzero.firestack.backend.RpnEntitlement
 import com.celzero.firestack.backend.RpnServers
 import com.celzero.firestack.settings.Settings
@@ -2999,6 +3001,7 @@ object RpnProxyManager : KoinComponent {
         }
     }
 
+    data class RpnStats(val routerStats: RouterStats?, val mtu: Long?, val status: Long?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?)
     suspend fun stats(): String {
         val sb = StringBuilder()
         sb.append("   Rpn active: ${isRpnActive()}\n\n")
@@ -3036,8 +3039,7 @@ object RpnProxyManager : KoinComponent {
             sb.append("   errRx: ${routerStats?.errRx}\n")
             sb.append("   errTx: ${routerStats?.errTx}\n")
             sb.append("   extra: ${routerStats?.extra}\n")
-            sb.append("   client4: ${stats?.clientV4}\n")
-            sb.append("   client6: ${stats?.clientV6}\n\n")
+            sb.append("   client4: ${stats?.clientV4}\n\n")
             val s = sb.toString()
             Logger.d(LOG_TAG_PROXY, "$TAG; id: $id stats:\n$s")
         }
