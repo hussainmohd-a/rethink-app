@@ -170,7 +170,6 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
 
         registerForActivityResult()
         initView()
-        showNewBadgeIfNeeded()
         setupClickListeners()
         setupOnBackPressed()
     }
@@ -178,13 +177,6 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean(KEY_THEME_CHANGE, isThemeChanged)
-    }
-
-    private fun showNewBadgeIfNeeded() {
-        val showBadge = NewSettingsManager.shouldShowBadge(NewSettingsManager.FIREWALL_BUBBLE)
-        if (!showBadge) return
-
-        b.settingsFirewallBubbleTxt.setBadgeDotVisible(this, true)
     }
 
     private fun setupOnBackPressed() {

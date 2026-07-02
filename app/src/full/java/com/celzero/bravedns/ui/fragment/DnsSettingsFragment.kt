@@ -52,7 +52,6 @@ import com.celzero.bravedns.ui.bottomsheet.BlockFreeDnsModeBottomSheet
 import com.celzero.bravedns.ui.bottomsheet.DnsRecordTypesBottomSheet
 import com.celzero.bravedns.ui.bottomsheet.LocalBlocklistsBottomSheet
 import com.celzero.bravedns.util.NewSettingsManager
-import com.celzero.bravedns.util.NewSettingsManager.BLOCK_UNKNOWN_IN_DNS
 import com.celzero.bravedns.util.SnackbarHelper
 import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.UIUtils.fetchColor
@@ -110,17 +109,6 @@ class DnsSettingsFragment : Fragment(R.layout.fragment_dns_configure),
         updateAllowedRecordTypesUi()
         // update block-free dns ui
         updateBlockFreeDnsUi()
-        showNewBadgeIfNeeded()
-    }
-
-
-    private fun showNewBadgeIfNeeded() {
-        if (NewSettingsManager.shouldShowBadge(NewSettingsManager.DNS_TO_BYPASS)) {
-            b.dcBlockFreeDnsHeading.setBadgeDotVisible(requireContext(), true)
-        }
-        if (NewSettingsManager.shouldShowBadge(BLOCK_UNKNOWN_IN_DNS)) {
-            b.dcBlockUnknownHeading.setBadgeDotVisible(requireContext(), true)
-        }
     }
 
 
