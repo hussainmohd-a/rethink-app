@@ -52,7 +52,6 @@ import com.celzero.bravedns.service.EncryptionException
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.ProxyManager
 import com.celzero.bravedns.service.VpnController
-import com.celzero.bravedns.service.WireguardManager
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.Constants.Companion.RPN_PROXY_FOLDER_NAME
 import com.celzero.bravedns.util.UIUtils
@@ -865,12 +864,12 @@ object RpnProxyManager : KoinComponent {
         }
     }
 
-    data class RpnProps(val id: String, val status: Long, val type: String, val kids: String, val addr: String, val created: Long, val expires: Long, val who: String, val locations: RpnServers) {
+    data class RpnProps(val id: String, val status: Long, val type: String, val addr: String, val created: Long, val expires: Long, val who: String, val locations: RpnServers) {
         override fun toString(): String {
             val cts = getTime(created)
             val ets = getTime(expires)
             val s = applicationContext.getString(UIUtils.getProxyStatusStringRes(status))
-            return "id = $id\nstatus = $s\ntype = $type\nkids = $kids\naddr = $addr\ncreated = $cts\nexpires = $ets\nwho = $who\nlocations = $locations"
+            return "id = $id\nstatus = $s\ntype = $type\naddr = $addr\ncreated = $cts\nexpires = $ets\nwho = $who\nlocations = $locations"
         }
     }
 
@@ -912,7 +911,7 @@ object RpnProxyManager : KoinComponent {
                             try {
                                 EncryptedFileManager.readByteArray(applicationContext, entitlementFile)
                             } catch (e: Exception) {
-                                Logger.e(LOG_TAG_PROXY, "$TAG; load, error reading win entitlement file: ${e.message}", e)
+                                Logger.e(LOG_TAG_PROXY, "$TAG; load, error reading win entitlement file: ${e.message}")
                                 byteArrayOf()
                             }
                         } else {
@@ -926,7 +925,7 @@ object RpnProxyManager : KoinComponent {
                             try {
                                 EncryptedFileManager.readByteArray(applicationContext, cfgFile)
                             } catch (e: Exception) {
-                                Logger.e(LOG_TAG_PROXY, "$TAG; load, error reading win state file (${cfgFile.absolutePath}): ${e.message}", e)
+                                Logger.e(LOG_TAG_PROXY, "$TAG; load, error reading win state file (${cfgFile.absolutePath}): ${e.message}")
                                 byteArrayOf()
                             }
                         } else {
@@ -1954,21 +1953,21 @@ object RpnProxyManager : KoinComponent {
      */
     suspend fun fetchAndConstructWinLocations(): Pair<Set<CountryConfig>, List<String>> {
          // Fetch from API
-         val winPropsResult = try {
-             VpnController.getRpnProps(RpnType.WIN)
+         val locationsRes = try {
+             VpnController.getRpnLocations(RpnType.WIN)
          } catch (e: Exception) {
              Logger.e(LOG_TAG_PROXY, "$TAG; fetchAndConstructWinLocations: exception getting RPN props: ${e.message}", e)
              return Pair(emptySet(), emptyList())
          }
 
-         val winProps = winPropsResult.first
-         if (winProps == null) {
+         val locations = locationsRes.first
+         if (locations == null) {
              Logger.w(LOG_TAG_PROXY, "$TAG; err; win props is null")
              return Pair(emptySet(), emptyList())
          }
 
          val count = try {
-             winProps.locations.len()
+             locations.len()
          } catch (e: Exception) {
              Logger.e(LOG_TAG_PROXY, "$TAG; fetchAndConstructWinLocations: exception getting locations count: ${e.message}", e)
              return Pair(emptySet(), emptyList())
@@ -1982,7 +1981,7 @@ object RpnProxyManager : KoinComponent {
          val newServers = mutableSetOf<CountryConfig>()
          for(i in 0 until count) {
              try {
-                 val loc = winProps.locations.get(i)
+                 val loc = locations.get(i)
                  if (loc == null) {
                      Logger.w(LOG_TAG_PROXY, "$TAG; err; location is null at index $i")
                      continue
@@ -2572,6 +2571,20 @@ object RpnProxyManager : KoinComponent {
          }
      }
 
+    private suspend fun isAnyProxyLockdown(proxies: List<String>): Boolean {
+        var lockdown = false
+        proxies.forEach { pid ->
+            val config = winCacheMutex.withLock {
+                if (pid == Backend.RpnWin || pid.equals(AUTO_SERVER_ID, true)) winServersCache.find { pid.equals(AUTO_SERVER_ID, true) }
+                else winServersCache.find { it.id == pid || it.key == pid }
+            }
+            lockdown = config?.lockdown ?: false
+            if (lockdown) return true
+        }
+
+        return lockdown
+    }
+
     suspend fun getAllPossibleConfigIdsForApp(
         uid: Int,
         ip: String,
@@ -2599,35 +2612,21 @@ object RpnProxyManager : KoinComponent {
         // app-specific configs may be empty if the app is not configured
         if (rpnProxyIdsForApp.isNotEmpty()) {
             for (pid in rpnProxyIdsForApp) {
-                val appProxyPair = canUseConfig(pid, "app($uid)", usesMobileNw, ssid)
-                if (!appProxyPair.second) {
-                    // lockdown or block; honor it and stop further processing
-                    proxyIds.clear()
-                    if (appProxyPair.first == block) {
-                        proxyIds.add(block)
-                    } else if (appProxyPair.first.isNotEmpty()) {
-                        var id = appProxyPair.first
-                        if (id.contains(AUTO_SERVER_ID, true)) {
-                            id = VpnController.getWinByKey("")?.id() ?: block
-                            proxyIds.add(id)
-                        } else {
-                            proxyIds.add(appProxyPair.first)
-                        }
-                    }
-                    Logger.i(LOG_TAG_PROXY, "$TAG lockdown wg for app($uid) => return $proxyIds")
-                    return proxyIds
-                }
-                if (appProxyPair.first.isNotEmpty()) {
-                    // add eligible app-specific config in the order we see them
-                    var id = appProxyPair.first
-                    if (id.contains(AUTO_SERVER_ID, true)) {
-                        id = VpnController.getWinByKey("")?.id() ?: block
+                val canUse = canUseConfig(pid, "app($uid)", usesMobileNw, ssid)
+                if (canUse) {
+                    if (pid.contains(AUTO_SERVER_ID, true)) {
+                        val id = VpnController.getWinByKey("")?.id() ?: block
                         proxyIds.add(id)
                     } else {
-                        proxyIds.add(appProxyPair.first)
+                        proxyIds.add(pid)
                     }
                 }
             }
+        }
+
+        if (isAnyProxyLockdown(proxyIds)) {
+            Logger.i(LOG_TAG_PROXY, "$TAG lockdown rpn for app($uid) => return $proxyIds")
+            return proxyIds
         }
 
         // once the app-specific config is added, check if any catch-all config is enabled
@@ -2698,10 +2697,9 @@ object RpnProxyManager : KoinComponent {
         type: String,
         usesMobileNw: Boolean,
         ssid: String
-    ): Pair<String, Boolean> {
-        val block = Backend.Block
+    ): Boolean {
         if (id.isEmpty()) {
-            return Pair("", true)
+            return false
         }
         val actualId = id.substringAfter(Backend.RpnWin)
 
@@ -2712,7 +2710,7 @@ object RpnProxyManager : KoinComponent {
 
         if (config == null) {
             Logger.e(LOG_TAG_PROXY, "$TAG; config null($actualId) no need to proceed, return empty")
-            return Pair("", true)
+            return false
         }
 
         Logger.vv(LOG_TAG_PROXY, "$TAG; config-details: $config")
@@ -2721,29 +2719,20 @@ object RpnProxyManager : KoinComponent {
 
         if (lockdown && isEligibleForNetwork(id, usesMobileNw, ssid, config.mobileOnly, config.ssidBased)) {
             Logger.d(LOG_TAG_PROXY, "$TAG; lockdown wg for $type => return $id")
-            return Pair(id, false) // no need to proceed further for lockdown
-        }
-
-        // in case of lockdown and not metered network, we need to return block as the
-        // lockdown should not leak the connections via WiFi
-        if (lockdown) {
-            // add IpnBlock instead of the config id, let the connection be blocked in WiFi
-            // regardless of config is active or not
-            Logger.d(LOG_TAG_PROXY, "$TAG; lockdown wg for $type => return $block")
-            return Pair(block, false) // no need to proceed further for lockdown
+            return true // no need to proceed further for lockdown
         }
 
         // check if the config is active and if it can be used on this network
         if (config.isEnabled && isEligibleForNetwork(id, usesMobileNw, ssid, config.mobileOnly, config.ssidBased)) {
             Logger.d(LOG_TAG_PROXY, "$TAG active wg for $type => add $id")
-            return Pair(id, true)
+            return true
         }
 
         Logger.v(
             LOG_TAG_PROXY,
             "$TAG wg for $type not active or not eligible nw, return empty, for id: $id, usesMobileNw: $usesMobileNw, ssid: $ssid"
         )
-        return Pair("", true)
+        return false
     }
 
     private fun matchesWildcard(pattern: String, text: String): Boolean {
@@ -3041,6 +3030,8 @@ object RpnProxyManager : KoinComponent {
             sb.append("   lastRxErr: ${routerStats?.lastRxErr}\n")
             sb.append("   lastTxErr: ${routerStats?.lastTxErr}\n")
             sb.append("   lastOk: ${getRelativeTimeSpan(routerStats?.lastOK)}\n")
+            sb.append("   lastOpen: ${getRelativeTimeSpan(routerStats?.lastOpen)}\n")
+            sb.append("   hdl: ${routerStats?.hdl}\n")
             sb.append("   since: ${getRelativeTimeSpan(routerStats?.since)}\n")
             sb.append("   errRx: ${routerStats?.errRx}\n")
             sb.append("   errTx: ${routerStats?.errTx}\n")
@@ -3055,6 +3046,8 @@ object RpnProxyManager : KoinComponent {
         }
         return sb.toString()
     }
+
+    data class ActiveRpnAddlInfo(val key: String, val name: String, val cc: String, val city: String, val addr: String, val pubPub: String, val load: Int, val allowed: String, val count: Int, val excluded: Boolean, val link: Int, val premium: Boolean)
 
     private fun getRelativeTimeSpan(t: Long?): CharSequence? {
         if (t == null) return "0"
