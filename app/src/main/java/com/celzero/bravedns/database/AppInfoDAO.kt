@@ -22,6 +22,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import com.celzero.bravedns.data.DataUsage
 
@@ -62,6 +63,20 @@ interface AppInfoDAO {
 
     @Query("update AppInfo set uid = :newUid, tombstoneTs = :tombstoneTs, modifiedTs = :modifiedTs where uid = :oldUid")
     fun tombstoneApp(oldUid: Int, newUid: Int, tombstoneTs: Long, modifiedTs: Long)
+
+    // clear stale values before updating
+    @Transaction
+    fun tombstoneAppWithPkg(newUid: Int, uid: Int, packageName: String, tombstoneTs: Long, modifiedTs: Long) {
+        deletePackage(newUid, packageName)
+        tombstoneApp(newUid, uid, packageName, tombstoneTs, modifiedTs)
+    }
+
+    // clear stale values before updating
+    @Transaction
+    fun tombstoneAppByUid(oldUid: Int, newUid: Int, tombstoneTs: Long, modifiedTs: Long) {
+        deleteByUid(newUid)
+        tombstoneApp(oldUid, newUid, tombstoneTs, modifiedTs)
+    }
 
     @Query("select * from AppInfo order by appCategory, uid") fun getAllAppDetails(): List<AppInfo>
 

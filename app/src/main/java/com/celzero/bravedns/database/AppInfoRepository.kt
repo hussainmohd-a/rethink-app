@@ -71,18 +71,13 @@ class AppInfoRepository(private val appInfoDAO: AppInfoDAO) {
 
     suspend fun tombstoneApp(oldUid: Int, newUid: Int, packageName: String?, tombstoneTs: Long) {
         val modifiedTs = System.currentTimeMillis()
-        try {
-            if (packageName == null) {
-                appInfoDAO.tombstoneApp(oldUid, newUid, tombstoneTs, modifiedTs)
-                return
-            }
-            appInfoDAO.tombstoneApp(oldUid, newUid, packageName, tombstoneTs, modifiedTs)
-        } catch (_: Exception) {
-            // tombstoneApp is called when there is a package name change or uid change
-            // in both the cases, we try to update the existing record with new uid or package name
-            // if the record is not present, it throws exception, which we catch here
-            // no need to log this exception
+        if (packageName == null) {
+            // clear stale values before updating
+            appInfoDAO.tombstoneAppByUid(oldUid, newUid, tombstoneTs, modifiedTs)
+            return
         }
+        // clear stale values before updating
+        appInfoDAO.tombstoneAppWithPkg(newUid, oldUid, packageName, tombstoneTs, modifiedTs)
     }
 
     suspend fun getAppInfo(): List<AppInfo> {
