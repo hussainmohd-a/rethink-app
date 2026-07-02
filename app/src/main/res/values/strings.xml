@@ -2339,8 +2339,8 @@
     <!-- ServerWgConfigDetailActivity live stats card -->
     <string name="lbl_last_handshake" translatable="false">Last Handshake</string>
     <string name="lbl_errors" translatable="false">Errors</string>
-    <string name="lbl_client_ipv4" translatable="false">Client IPv4</string>
-    <string name="lbl_client_ipv6" translatable="false">Client IPv6</string>
+    <string name="lbl_client_ipv4" translatable="false">Client Info</string>
+    <string name="lbl_server_info" translatable="false">Server Info</string>
     <string name="lbl_never" translatable="false">Never</string>
 
     <!-- Emoji icons used in the privacy exposure card -->
