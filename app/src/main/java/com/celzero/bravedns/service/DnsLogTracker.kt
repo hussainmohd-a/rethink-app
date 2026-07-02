@@ -74,20 +74,14 @@ internal constructor(
         vpnStateMap[Transaction.Status.INTERNAL_ERROR] = BraveVPNService.State.APP_ERROR
     }
 
-    fun processOnResponse(summary: DNSSummary, rethinkUid: Int): Transaction {
-        val latencyMs = summary.start
+    fun processOnResponse(summary: DNSSummary): Transaction {
+        val latencyMs = (TimeUnit.SECONDS.toMillis(1L) * summary.latency).toLong()
         val nowMs = SystemClock.elapsedRealtime()
-        val queryTimeMs = nowMs - latencyMs
+        val queryTimeMs = nowMs - summary.start
         var uid = INVALID_UID
 
         try {
-            uid = if (summary.uid == Backend.UidSelf) {
-                rethinkUid
-            } else if (summary.uid == Backend.UidSystem) {
-                AndroidUidConfig.SYSTEM.uid // 1000
-            } else {
-                summary.uid.toInt()
-            }
+            uid = summary.uid.toInt()
         } catch (_: NumberFormatException) {
             Logger.w(LOG_TAG_VPN, "onQuery: invalid uid: ${summary.uid}, using default uid: $uid")
         }
