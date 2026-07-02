@@ -123,7 +123,7 @@ object IpRulesManager : KoinComponent {
             val v = treeVal(it.uid, port, it.status, it.proxyId, it.proxyCC)
             if (k != null) {
                 try {
-                    Logger.i(LOG_TAG_FIREWALL, "iptree.add($k, $v)")
+                    Logger.vv(LOG_TAG_FIREWALL, "iptree.add($k, $v)")
                     iptree.add(k, v)
                     if (it.proxyCC.isNotEmpty()) selectedCCs.add(it.proxyCC)
                 } catch (e: Exception) {
@@ -131,6 +131,7 @@ object IpRulesManager : KoinComponent {
                 }
             }
         }
+        Logger.i(LOG_TAG_FIREWALL, "ip rules loaded, count: ${iptree.len()}")
         return iptree.len()
     }
 
@@ -253,7 +254,7 @@ object IpRulesManager : KoinComponent {
 
         resultsCache.getIfPresent(ck)?.let {
             // return only if both ip and app(uid) matches
-            Logger.i(LOG_TAG_FIREWALL, "match in cache $uid $ipstr: $it")
+            logv("match in cache $uid $ipstr: $it")
             return it
         }
 

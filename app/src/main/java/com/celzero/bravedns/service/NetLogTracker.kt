@@ -191,8 +191,8 @@ internal constructor(
 
     // now, this method is doing multiple things which should be removed.
     // fixme: should intend to only write the logs to database.
-    fun processDnsLog(summary: DNSSummary, rethinkUid: Int) {
-        val transaction = dnsdb.processOnResponse(summary, rethinkUid)
+    fun processDnsLog(summary: DNSSummary) {
+        val transaction = dnsdb.processOnResponse(summary)
 
         transaction.responseCalendar = Calendar.getInstance()
 

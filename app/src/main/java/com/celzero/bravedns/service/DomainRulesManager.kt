@@ -140,7 +140,7 @@ object DomainRulesManager : KoinComponent {
             // not cause any issues, but to avoid unnecessary entries in the trie, skipping these
             // entries
             if (cd.uid < 0 && cd.uid != Constants.UID_EVERYBODY) {
-                Logger.w(LOG_TAG_DNS, "skipping domain rule for uid: ${cd.uid}")
+                Logger.i(LOG_TAG_DNS, "skipping domain rule for uid: ${cd.uid}")
                 return@forEach
             }
             val key = mkTrieKey(cd.domain, cd.uid)
@@ -459,6 +459,7 @@ object DomainRulesManager : KoinComponent {
                 updateUid(uid, newUid)
             }
         }
+        Logger.i(LOG_TAG_FIREWALL, "domain rules updated")
     }
 
     suspend fun updateUid(uid: Int, newUid: Int) {
