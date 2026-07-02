@@ -2699,26 +2699,6 @@ class GoVpnAdapter : KoinComponent {
         addRpnProxyDns(id)
     }
 
-    suspend fun removeRpnDns(id: String) {
-        Logger.v(LOG_TAG_VPN, "$TAG removeRpnDns, id: $id")
-        try {
-            val res = getRDNSResolver()?.remove(id)
-            Logger.v(LOG_TAG_VPN, "$TAG rpn removeDnsProxyTransport done? $res")
-            logEvent(
-                Severity.LOW,
-                "rpn dns($id) removed",
-                "id: $id"
-            )
-        } catch (e: Exception) {
-            Logger.e(LOG_TAG_VPN, "$TAG err remove rpn dns($id): ${e.message}", e)
-            logEvent(
-                Severity.HIGH,
-                "rpn dns($id) remove failed",
-                "error removing rpn dns, reason: ${e.message}"
-            )
-        }
-    }
-
     private suspend fun addRpnProxyDns(id: String) {
         Logger.v(LOG_TAG_VPN, "$TAG addRpnProxyDns, id: $id")
         try {
@@ -2998,6 +2978,12 @@ class GoVpnAdapter : KoinComponent {
 
             val win = tunnel.proxies.rpn().win()
 
+            val alreadyAdded = win.has(key)
+            if (alreadyAdded) {
+                Logger.i(LOG_TAG_PROXY, "$TAG already added win(rpn) server: $key")
+                return Pair(true, "Already added server: $key")
+            }
+
             val kids = win.kids()
             val prevServerCount = kids?.len() ?: 0
             if (prevServerCount >= RpnProxyManager.MAX_WIN_SERVERS) {
@@ -3005,19 +2991,7 @@ class GoVpnAdapter : KoinComponent {
                 return Pair(false, "Max servers reached: $prevServerCount, skipping add")
             }
             Logger.i(LOG_TAG_PROXY, "$TAG kids: $kids")
-            var alreadyAdded = false
-            if (kids.len() > 0) {
-                for (i in 0 until kids.len()) {
-                    if (kids.get(i).key.equals(key, true)) {
-                        alreadyAdded = true
-                        break
-                    }
-                }
-            }
-            if (alreadyAdded) {
-                Logger.i(LOG_TAG_PROXY, "$TAG already added win(rpn) server: $key")
-                return Pair(true, "Already added server: $key")
-            }
+
             Logger.d(LOG_TAG_PROXY, "$TAG init add new win(rpn) server: $key")
             val res = win.fork(key)
             logEvent(Severity.MEDIUM, "add new win(rpn) server", "Added new server: $key, id? ${res.id()}")
@@ -3029,7 +3003,7 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
-    suspend fun handleOnRpnAdded(id: String) {
+    suspend fun handleOnRpnAddedOrUpdated(id: String) {
         addRpnDns(id)
         handleRpnHop(id)
     }
@@ -3053,6 +3027,7 @@ class GoVpnAdapter : KoinComponent {
             val rpnWinId = Backend.RpnWin + hopId
             removeHop(rpnWinId)
         } else {
+            Logger.i(LOG_TAG_PROXY, "$TAG hop not enabled for $hopId, skipping add/remove")
             Pair(true, "Hop not enabled, skipping add/remove")
         }
     }
@@ -3064,27 +3039,16 @@ class GoVpnAdapter : KoinComponent {
             Logger.w(LOG_TAG_VPN, "$TAG addRpnHop; no origin win proxy id found, skip add hop for $hopId")
             return Pair(false, "No origin win proxy id found, cannot add hop")
         }
-
-        val kids = tunnel.proxies.rpn().win().kids()
-        Logger.vv(LOG_TAG_VPN, "$TAG addRpnHop; kids: $kids, hopId: $hopId")
-        // see if the id which is passed is already in the kids list, if not no need to proceed
-        var actualId = ""
-        if (kids.len() > 0) {
-            for (i in 0 until kids.len()) {
-                val k = kids.get(i).key
-                if (k.equals(hopId, true)) {
-                    actualId = k
-                    break
-                }
-            }
-        }
-        if (actualId.isEmpty()) {
+        val win = tunnel.proxies.rpn().win()
+        Logger.vv(LOG_TAG_VPN, "$TAG addRpnHop; hopId: $hopId")
+        // see if the id which is passed is already in the list, if not no need to proceed
+        if (!win.has(hopId)) {
             Logger.i(LOG_TAG_VPN, "$TAG addRpnHop; no hop found for $origin")
             return Pair(false, "No hop found for $origin")
         }
         // TODO: see if the hop is already added, if so no need to redo this
         try {
-            val rpnWinId = Backend.RpnWin + actualId
+            val rpnWinId = Backend.RpnWin + hopId
             tunnel.proxies.hop(rpnWinId, origin)
             logEvent(Severity.LOW, "set hop", "set hop for $origin -> $rpnWinId")
             Logger.i(LOG_TAG_VPN, "$TAG addRpnHop; new hop for $origin -> $rpnWinId")
