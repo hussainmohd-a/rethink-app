@@ -97,8 +97,11 @@ import com.celzero.bravedns.util.restoreFrost
 import com.celzero.firestack.intra.Intra
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.koin.android.ext.android.inject
 import org.koin.core.component.KoinComponent
 import java.io.File
@@ -660,34 +663,84 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun openStatsDialog() {
-        io {
-            val stat = VpnController.getNetStat()
-            val formatedStat = UIUtils.formatNetStat(stat) ?: ""
-            val vpnStats = VpnController.vpnStats() ?: ""
-            val stats = formatedStat + vpnStats
-            uiCtx {
-                if (!isAdded) return@uiCtx
-                val ctx = requireContext()
-                val pad = resources.getDimensionPixelSize(R.dimen.dots_margin_bottom)
+        if (!isAdded) return
+        val ctx = requireContext()
+        val pad = resources.getDimensionPixelSize(R.dimen.dots_margin_bottom)
+        val notAvailable = ctx.getString(R.string.lbl_not_available_short)
 
-                val tv = android.widget.TextView(ctx).apply {
-                    setPadding(pad, pad / 2, pad, pad)
-                    text = stats.ifEmpty { ctx.getString(R.string.lbl_not_available_short) }
-                    setTextIsSelectable(true)
-                    typeface = android.graphics.Typeface.MONOSPACE
-                    textSize = 11.5f
+        val progressDialog = MaterialAlertDialogBuilder(ctx, R.style.App_Dialog_NoDim)
+            .setTitle(getString(R.string.title_statistics))
+            .setView(android.widget.ProgressBar(ctx).apply { isIndeterminate = true })
+            .setCancelable(true)
+            .setPositiveButton(R.string.fapps_info_dialog_positive_btn) { d, _ -> d.dismiss() }
+            .create()
+        progressDialog.show()
+
+        io {
+            val (stats, timedOut) = try {
+                val result = withTimeout(5000L.milliseconds) {
+                    val stat = VpnController.getNetStat()
+                    val formatedStat = UIUtils.formatNetStat(stat) ?: ""
+                    val vpnStats = VpnController.vpnStats() ?: ""
+                    formatedStat + vpnStats
                 }
-                val scrollView = android.widget.ScrollView(ctx).apply {
-                    addView(tv)
-                    scrollBarStyle = android.widget.ScrollView.SCROLLBARS_INSIDE_OVERLAY
+                result to false
+            } catch (_: TimeoutCancellationException) {
+                ctx.getString(R.string.lbl_not_available_short) to true
+            }
+
+            val lines = if (stats.isBlank()) {
+                listOf(notAvailable)
+            } else {
+                if (timedOut) listOf("Stats collection timed out, partial results:\n") + stats.split('\n')
+                else stats.split('\n')
+            }
+            val clipText = if (timedOut) "TIMED OUT\n$stats" else stats.ifEmpty { notAvailable }
+
+            uiCtx {
+                progressDialog.dismiss()
+                if (!isAdded) return@uiCtx
+
+                // use recycler as using textview with large stats causes OOM and ANR issues
+                val recyclerView = androidx.recyclerview.widget.RecyclerView(ctx).apply {
+                    layoutManager = androidx.recyclerview.widget.LinearLayoutManager(ctx)
+                    setHasFixedSize(true)
+                    adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<
+                            androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
+                        override fun getItemCount() = lines.size
+                        override fun onCreateViewHolder(
+                            parent: android.view.ViewGroup,
+                            viewType: Int
+                        ): androidx.recyclerview.widget.RecyclerView.ViewHolder {
+                            val tv = android.widget.TextView(ctx).apply {
+                                setPadding(pad, 1, pad, 1)
+                                typeface = android.graphics.Typeface.MONOSPACE
+                                textSize = 11.5f
+                                isFocusable = false
+                            }
+                            return object : androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {}
+                        }
+                        override fun onBindViewHolder(
+                            holder: androidx.recyclerview.widget.RecyclerView.ViewHolder,
+                            position: Int
+                        ) {
+                            (holder.itemView as android.widget.TextView).text = lines[position]
+                        }
+                    }
+                }
+
+                val container = android.widget.LinearLayout(ctx).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    addView(recyclerView, android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
                 }
 
                 MaterialAlertDialogBuilder(ctx, R.style.App_Dialog_NoDim)
                     .setTitle(getString(R.string.title_statistics))
-                    .setView(scrollView)
+                    .setView(container)
                     .setPositiveButton(R.string.fapps_info_dialog_positive_btn) { d, _ -> d.dismiss() }
                     .setNeutralButton(R.string.dns_info_neutral) { _, _ ->
-                        copyToClipboard("stats_dump", stats)
+                        copyToClipboard("stats_dump", clipText)
                         showToastUiCentered(
                             ctx,
                             getString(R.string.copied_clipboard),
@@ -696,12 +749,6 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
                     }.create()
                     .show()
             }
-        }
-        // printSysEnvAndProps() is debug-only and slow (reflective OsConstants
-        // iteration + many Os.sysconf calls). Run it on its own coroutine so
-        // it never blocks the dialog flow or starves the shared IO dispatcher.
-        if (DEBUG) {
-            io { printSysEnvAndProps() }
         }
     }
 
