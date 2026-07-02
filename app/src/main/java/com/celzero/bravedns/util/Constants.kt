@@ -292,6 +292,7 @@ class Constants {
         const val TIME_FORMAT_2 = "yy.MM (dd)"
         const val TIME_FORMAT_3 = "dd MMMM yyyy, HH:mm:ss"
         const val TIME_FORMAT_4 = "dd/MM/yy, HH:mm:ss"
+        const val TIME_FORMAT_5 = "HH:mm:ss.SSS"
 
         // play services package name
         const val PKG_NAME_PLAY_STORE = "com.android.vending"

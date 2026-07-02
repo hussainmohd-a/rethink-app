@@ -16,7 +16,6 @@
 package com.celzero.bravedns.backup
 
 import Logger
-import Logger.LOG_TAG_APP_DB
 import Logger.LOG_TAG_BACKUP_RESTORE
 import android.content.Context
 import android.content.SharedPreferences
@@ -39,7 +38,6 @@ import com.celzero.bravedns.backup.BackupHelper.Companion.unzip
 import com.celzero.bravedns.data.AppConfig
 import com.celzero.bravedns.database.AppDatabase
 import com.celzero.bravedns.database.LogDatabase
-import com.celzero.bravedns.database.RefreshDatabase.Companion.ACTION_REFRESH_RESTORE
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.RethinkBlocklistManager
 import com.celzero.bravedns.util.Constants

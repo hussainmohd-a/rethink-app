@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Captures network logs and stores in ConnectionTracker, a room database. */
 class ConnectionTrackerFragment :
@@ -422,7 +423,7 @@ class ConnectionTrackerFragment :
     private fun setQueryFilter() {
         lifecycleScope.launch {
             searchQuery
-                .debounce(QUERY_TEXT_DELAY)
+                .debounce(QUERY_TEXT_DELAY.milliseconds)
                 .distinctUntilChanged()
                 .collect { query ->
                     filterQuery = query

@@ -969,12 +969,16 @@ object FirewallManager : KoinComponent {
 
     suspend fun exemptRethinkApp(rethinkUid: Int) {
         mutex.withLock {
-            appInfos.get(rethinkUid).forEach {
-                it.connectionStatus = ConnectionStatus.ALLOW.id
-                it.firewallStatus = FirewallStatus.BYPASS_DNS_FIREWALL.id
-                it.isProxyExcluded = true
-                it.modifiedTs = System.currentTimeMillis()
+            val appInfo = appInfos[rethinkUid].firstOrNull()
+            if (appInfo == null) {
+                Logger.e(LOG_TAG_FIREWALL, "appInfo is null for uid: $rethinkUid")
+                return@withLock
             }
+
+            appInfo.connectionStatus = ConnectionStatus.ALLOW.id
+            appInfo.firewallStatus = FirewallStatus.BYPASS_DNS_FIREWALL.id
+            appInfo.isProxyExcluded = true
+            appInfo.modifiedTs = System.currentTimeMillis()
         }
         db.updateProxyExcluded(rethinkUid, true)
     }
