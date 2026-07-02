@@ -37,6 +37,7 @@ import com.celzero.firestack.backend.Proxy
 import com.celzero.firestack.backend.RDNS
 import com.celzero.firestack.backend.RouterStats
 import com.celzero.firestack.backend.RpnEntitlement
+import com.celzero.firestack.backend.RpnServers
 import com.celzero.firestack.intra.Controller
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -252,8 +253,12 @@ object VpnController : KoinComponent {
         return braveVpnService?.getWireGuardStats(id)
     }
 
-    suspend fun getRpnStats(id: String): WireguardManager.WgStats? {
+    suspend fun getRpnStats(id: String): RpnProxyManager.RpnStats? {
         return braveVpnService?.getRpnStats(id)
+    }
+
+    suspend fun getRpnAddlInfo(id: String): RpnProxyManager.ActiveRpnAddlInfo? {
+        return braveVpnService?.getRpnAddlInfo(id)
     }
 
     suspend fun getSupportedIpVersion(id: String): Pair<Boolean, Boolean> {
@@ -439,6 +444,10 @@ object VpnController : KoinComponent {
 
     suspend fun getRpnProps(type: RpnProxyManager.RpnType): Pair<RpnProxyManager.RpnProps?, String?> {
         return braveVpnService?.getRpnProps(type) ?: Pair(null, null)
+    }
+
+    suspend fun getRpnLocations(type: RpnProxyManager.RpnType): Pair<RpnServers?, String?> {
+        return braveVpnService?.getRpnLocations(type) ?: Pair(null, null)
     }
 
     suspend fun addNewWinServer(key: String): Pair<Boolean, String> {
