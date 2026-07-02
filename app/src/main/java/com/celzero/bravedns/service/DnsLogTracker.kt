@@ -75,7 +75,7 @@ internal constructor(
     }
 
     fun processOnResponse(summary: DNSSummary, rethinkUid: Int): Transaction {
-        val latencyMs = (TimeUnit.SECONDS.toMillis(1L) * summary.latency).toLong()
+        val latencyMs = summary.start
         val nowMs = SystemClock.elapsedRealtime()
         val queryTimeMs = nowMs - latencyMs
         var uid = INVALID_UID
