@@ -17,6 +17,7 @@ import com.celzero.bravedns.scheduler.EnhancedBugReport
 import com.celzero.bravedns.service.BraveVPNService.Companion.NW_ENGINE_NOTIFICATION_ID
 import com.celzero.bravedns.service.GoCrashFileDescriptorReader
 import com.celzero.bravedns.service.GoLogFileDescriptorReader
+import com.celzero.bravedns.service.GoMemLogConsumer
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.activity.AppLockActivity
@@ -27,8 +28,6 @@ import com.celzero.firestack.backend.LogConsumer
 import com.celzero.firestack.intra.Console
 import com.celzero.firestack.intra.Intra
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -110,15 +109,16 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
     }
 
     override fun logMemFD(
-        p0: Long,
-        p1: Long,
-        p2: Long
-    ): LogConsumer? {
-        Logger.i(LOG_TAG_BUG_REPORT, "$TAG logMemFD: fd=$p0, start=$p1, end=$p2")
+        fda: Long,
+        fdb: Long,
+        bufferSize: Long,
+        size: Long
+    ): LogConsumer {
+        Logger.i(LOG_TAG_BUG_REPORT, "$TAG logMemFD: fd/a=$fda, fd/b=$fdb, buffer-sz=$bufferSize, sz: $size")
         // Return a GoMemLogConsumer that will drain the shared-memory buffer Go points us at.
         // Go will call drain(fd, start, end) on the returned consumer each time new data
         // is available, and onClose() when the writer is done.
-        return null//GoMemLogConsumer(ctx, scope)
+        return GoMemLogConsumer(ctx, scope, size.toInt())
     }
 
     private fun showNwEngineNotification(msg: String) {
