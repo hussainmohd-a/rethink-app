@@ -2114,7 +2114,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         val overlayMtu = overlayNetworks.mtu
         val underlyingMtu = underlyingNetworks?.minMtu ?: VPN_INTERFACE_MTU
         val minMtu = min(overlayMtu, underlyingMtu)
-        Logger.i(LOG_TAG_VPN, "mtu; proxy: $overlayMtu, underlying: $underlyingMtu, min: $minMtu")
+        Logger.i(LOG_TAG_VPN, "mtu for overlay: $overlayMtu, underlying: $underlyingMtu, min: $minMtu")
         // min mtu should be at least MIN_MTU (1280)
         if (minMtu <= MIN_MTU) {
             Logger.w(LOG_TAG_VPN, "mtu less than or equal to $MIN_MTU, using $MIN_MTU")
@@ -3334,14 +3334,20 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
                 }
                 // set system dns whenever there is a change in network
                 prevDns.clear()
+                if (vpnAdapter == null) {
+                    Logger.i(LOG_TAG_VPN, "setSystemAndDefaultDns: vpnAdapter is null, not setting system/default dns")
+                    return@io
+                }
                 prevDns.addAll(dnsServers)
                 val dns = dnsServers.map { it.hostAddress }
-                vpnAdapter?.setSystemDns(dns)
+                val isSysDnsSet = vpnAdapter?.setSystemDns(dns)
+                var defSet: Boolean? = false
                 // set default dns server for the tunnel if none is set
                 if (isDefaultDnsNone()) {
                     val dnsCsv = dns.joinToString(",")
-                    vpnAdapter?.addDefaultTransport(dnsCsv)
+                    defSet = vpnAdapter?.addDefaultTransport(dnsCsv)
                 }
+                Logger.i(LOG_TAG_VPN, "setSystemAndDefaultDns: sys-dns set? $isSysDnsSet, def-set? $defSet/none? ${isDefaultDnsNone()}")
 
                 val id = if (appConfig.isSmartDnsEnabled()) Backend.Plus else Backend.Preferred
                 val mainDnsStatus = vpnAdapter?.getDnsStatus(id)
@@ -4097,11 +4103,6 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
                     rethinkUid.toString() -> {
                         rethinkUid
                     }
-
-                    /*// it is currently unused from firestack
-                    Backend.UidSystem -> {
-                        AndroidUidConfig.SYSTEM.uid // 1000
-                    }*/
 
                     else -> {
                         uidStr.toInt()

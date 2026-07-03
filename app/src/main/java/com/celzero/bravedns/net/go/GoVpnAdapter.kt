@@ -1875,10 +1875,10 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
-    suspend fun addDefaultTransport(url: String?) {
+    suspend fun addDefaultTransport(url: String?): Boolean {
         if (!tunnel.isConnected) {
             Logger.e(LOG_TAG_VPN, "$TAG no tunnel, skip add default dns")
-            return
+            return false
         }
         var type = Backend.DNS53
         val fallbackUrl = getDefaultFallbackDns()
@@ -1893,7 +1893,7 @@ class GoVpnAdapter : KoinComponent {
 
         // default transport is always sent to Ipn.Exit in the go code and so dns
         // request sent to the default transport will not be looped back into the tunnel
-        try {
+        return try {
             // when the url is empty, set the default transport to fallbackUrl
             if (url.isNullOrEmpty()) {
                 Logger.i(LOG_TAG_VPN, "$TAG url empty, set default dns to $type, $fallbackUrl, usingGoos: $usingGoos")
@@ -1902,7 +1902,7 @@ class GoVpnAdapter : KoinComponent {
                 } else {
                     Intra.addDefaultTransport(tunnel, type, fallbackUrl, "")
                 }
-                return
+                return true
             } else if (url.contains("http")) {
                 type = Backend.DOH
             }
@@ -1915,6 +1915,7 @@ class GoVpnAdapter : KoinComponent {
                 "Default DNS set to: $url with IPs: $ips"
             )
             Logger.i(LOG_TAG_VPN, "$TAG default dns set, url: $url ips: $ips, type: $type")
+            true
         } catch (e: Exception) {
             Logger.w(LOG_TAG_VPN, "$TAG err new default dns($url): ${e.message}", e)
             logEvent(
@@ -1924,7 +1925,7 @@ class GoVpnAdapter : KoinComponent {
             )
             // most of the android devices have google dns, so add it as default transport
             // TODO: notify the user that the default transport could not be set
-            try {
+            return try {
                 if (usingGoos) {
                     Logger.i(LOG_TAG_VPN, "$TAG; fallback; set empty default dns, usingGoos: $usingGoos")
                     Intra.addDefaultTransport(tunnel, "", "", "")
@@ -1932,9 +1933,11 @@ class GoVpnAdapter : KoinComponent {
                     Logger.i(LOG_TAG_VPN, "$TAG; fallback; set default dns to $fallbackUrl")
                     Intra.addDefaultTransport(tunnel, type, fallbackUrl, "")
                 }
+                true
             } catch (e: Exception) {
                 // fixme: this is not expected to happen, should show a notification?
                 Logger.e(LOG_TAG_VPN, "$TAG err add $fallbackUrl transport: ${e.message}", e)
+                false
             }
         }
     }
@@ -1981,7 +1984,7 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
-    suspend fun setSystemDns(systemDns: List<String?>) {
+    suspend fun setSystemDns(systemDns: List<String?>): Boolean {
         if (!tunnel.isConnected) {
             Logger.e(LOG_TAG_VPN, "$TAG no tunnel, skip setting system-dns")
             logEvent(
@@ -1989,11 +1992,11 @@ class GoVpnAdapter : KoinComponent {
                 "set system dns failed",
                 "Tunnel is not connected"
             )
-            return
+            return false
         }
         // for Rethink within rethink mode, the system dns is system dns is always set to Ipn.Base
         // in go and so dns request sent to the system dns will be looped back into the tunnel
-        try {
+        return try {
             // TODO: system dns may be non existent; see: AppConfig#updateSystemDnsServers
             // convert list to comma separated string, as Intra expects as csv
             val sysDnsStr = systemDns.filter { it?.isNotEmpty() == true }.joinToString(",")
@@ -2008,6 +2011,7 @@ class GoVpnAdapter : KoinComponent {
                 "set system dns",
                 "System DNS set to: $sysDnsStr"
             )
+            true
         } catch (e: Exception) { // this is not expected to happen
             Logger.e(LOG_TAG_VPN, "$TAG set system dns: could not parse: $systemDns", e)
             // remove the system dns, if it could not be set
@@ -2017,6 +2021,7 @@ class GoVpnAdapter : KoinComponent {
                 "set system dns failed",
                 "Error: ${e.message}"
             )
+            false
         }
     }
 
