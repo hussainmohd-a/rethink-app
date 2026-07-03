@@ -350,7 +350,7 @@ internal constructor(
                 // delete the app from the database only if tombstone expiry time has elapsed
                 // or if restore is true or tombstone is disabled
                 val canDelete = !persistentState.tombstoneApps || restore || (appInfo.tombstoneTs > 0L && currentTime - appInfo.tombstoneTs > TOMBSTONE_EXPIRY_TIME_MS)
-                if (canDelete) {
+                if (canDelete && it.uid != Constants.UID_EVERYBODY) {
                     // remove all the rules related to the packages
                     IpRulesManager.deleteRulesByUid(it.uid)
                     DomainRulesManager.deleteRulesByUid(it.uid)
