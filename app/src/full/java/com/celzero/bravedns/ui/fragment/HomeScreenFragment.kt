@@ -115,6 +115,7 @@ import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
     private val b by viewBinding(FragmentHomeScreenBinding::bind)
@@ -1160,7 +1161,6 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                 repeat(5) {
                     val status = VpnController.getDnsStatus(id)
                     if (status != null) {
-                        failing = false
                         uiCtx {
                             if (isAdded && view != null) {
                                 b.fhsCardDnsLatency.visibility = View.VISIBLE
@@ -1170,7 +1170,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                         return@io
                     }
                     // status null means the dns transport is not active / different id is used
-                    kotlinx.coroutines.delay(1000L)
+                    kotlinx.coroutines.delay(1000L.milliseconds)
                     failing = true
                 }
                 uiCtx {

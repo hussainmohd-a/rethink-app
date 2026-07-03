@@ -18,6 +18,7 @@ import com.celzero.bravedns.util.Constants
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 class AppInfoViewModel(private val appInfoDAO: AppInfoDAO) : ViewModel() {
 
@@ -43,7 +44,7 @@ class AppInfoViewModel(private val appInfoDAO: AppInfoDAO) : ViewModel() {
     private fun debounceFilter(searchString: String) {
         debounceJob?.cancel()
         debounceJob = viewModelScope.launch {
-            delay(300) // 300ms debounce delay
+            delay(300.milliseconds) // 300ms debounce delay
             filter.value = searchString
         }
     }
