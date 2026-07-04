@@ -181,7 +181,7 @@ object IpRulesManager : KoinComponent {
         }
     }
 
-    private fun treeValLike(uid: Int, port: Int): String? {
+    private fun treeValLike(uid: Int, port: Int): String {
         return ("$uid$KV_SEP$port")
     }
 
@@ -275,7 +275,7 @@ object IpRulesManager : KoinComponent {
             }
         }
         getMostSpecificRouteMatch(uid, ipstr, port).let {
-            logv("route rule for $uid $ipstr $port => ${it.name}")
+            logv("route rule for $uid $ipstr $port => ${it.name} ??")
             if (it != IpRuleStatus.NONE) {
                 resultsCache.put(ck, it)
                 return it
@@ -357,7 +357,7 @@ object IpRulesManager : KoinComponent {
             val x = iptree.getLike(k, vlike)
             logv("getMostSpecificRuleMatch: $uid, $k, $vlike => $x")
             val treeValues = x?.split(Backend.Vsep) ?: return IpRuleStatus.NONE
-            treeValues.forEach {
+            treeValues.reversed().forEach {
                 val treeVal = convertStringToTreeVal(it)
                 if (treeVal == null) {
                     logv("getMostSpecificRuleMatch: $uid, $k, $vlike => treeVal is null for $it")
@@ -403,7 +403,7 @@ object IpRulesManager : KoinComponent {
             if (DEBUG) logv("getMostSpecificRuleMatch: $uid, $k, $vlike => $x")
             val treeVals = x?.split(Backend.Vsep) ?: return Pair("","")
 
-            treeVals.forEach {
+            treeVals.reversed().forEach {
                 val treeVal = convertStringToTreeVal(it)
                 if (treeVal == null) {
                     logv("getMostSpecificMatchProxies: $uid, $k, $vlike => treeVal is null for $it")
@@ -429,7 +429,7 @@ object IpRulesManager : KoinComponent {
             // (10169:443:0) => (uid : port : rule[0->none, 1-> block, 2 -> trust, 3 -> bypass])
             logv("getMostSpecificRouteMatch: $uid, $k, $vlike => $x")
             val treeVals = x?.split(Backend.Vsep) ?: return IpRuleStatus.NONE
-            treeVals.forEach {
+            treeVals.reversed().forEach {
                 val treeVal = convertStringToTreeVal(it)
                 if (treeVal == null) {
                     logv("getMostSpecificRouteMatch: $uid, $k, $vlike => treeVal is null for $it")
@@ -455,7 +455,7 @@ object IpRulesManager : KoinComponent {
             // (10169:443:0) => (uid : port : rule[0->none, 1-> block, 2 -> trust, 3 -> bypass])
             logv("getMostSpecificRouteMatch: $uid, $k, $vlike => $x")
             val treeVals = x?.split(Backend.Vsep) ?: return Pair("","")
-            treeVals.forEach {
+            treeVals.reversed().forEach {
                 val treeVal = convertStringToTreeVal(it)
                 if (treeVal == null) {
                     logv("getMostSpecificRouteProxies: $uid, $k, $vlike => treeVal is null for $it")
