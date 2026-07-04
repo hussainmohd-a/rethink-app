@@ -421,7 +421,7 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
         persistentState.showWhatsNewChip = true
         persistentState.appUpdateTimeTs = System.currentTimeMillis()
 
-        // v055u, exempt rethink as the firewall rules is now stricter compared to prev versions.
+        // 53-v055u, exempt rethink as the firewall rules is now stricter compared to prev versions.
         // remove this if we have a proper ui to communicate those to users.
         if (prevVersion <= 53) {
             val rethinkUid = android.os.Process.myUid()

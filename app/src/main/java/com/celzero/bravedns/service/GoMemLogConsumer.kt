@@ -98,10 +98,10 @@ class GoMemLogConsumer(private val appContext: Context, private val scope: Corou
 
             // see if the fda can supports buffer IO, if not return null so that we can fallback
             // to logFD
-            if (!supportsBufferedIO(fda.toInt())) {
+            /*if (!supportsBufferedIO(fda.toInt())) {
                 Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: fd=$fda does not support buffered IO")
                 return null
-            }
+            }*/
 
             val goMem = GoMemLogConsumer(appContext, scope, slotSize)
 
