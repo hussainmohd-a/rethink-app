@@ -1,10 +1,9 @@
 package com.celzero.bravedns.util
 
 import Logger
-import Logger.LOG_GO_LOGGER
+import Logger.LOG_GO_LOGGER_V1
 import Logger.LOG_TAG_APP
 import Logger.LOG_TAG_BUG_REPORT
-import Logger.LOG_TAG_VPN
 import android.annotation.SuppressLint
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -64,7 +63,7 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
             Logger.e(LOG_TAG_BUG_REPORT, "$TAG init: failed to create crash file")
         } else {
             Logger.i(LOG_TAG_BUG_REPORT, "$TAG init: path: ${crashFile.absolutePath}")
-            Intra.setCrashOutput(crashFile.absolutePath)
+            Intra.setCrashOutput(crashFile.absolutePath, crashFile.absolutePath)
         }
     }
 
@@ -84,7 +83,7 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
             val l = Logger.LoggerLevel.fromId(level) ?: Logger.LoggerLevel.NONE
             if (l.stacktrace()) {
                 // disable crash logging for now
-                if (false) Logger.crash(LOG_GO_LOGGER, msg) // write to in-mem db
+                if (false) Logger.crash(LOG_GO_LOGGER_V1, msg) // write to in-mem db
                 if (!isFdroidFlavour()) CrashReporter.recordGoCrash(msg)
                 val token = if (isWebsiteDegoogledFlavour()) "website-degoogled"
                             else if (isFdroidFlavour()) "fdroid"
@@ -104,7 +103,7 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
         Logger.i(LOG_TAG_BUG_REPORT, "$TAG logFD: fd=$p0")
         val goLogFdReader = GoLogFileDescriptorReader(scope)
         val started = goLogFdReader.start(ctx, p0)
-        if (!started) Logger.w(LOG_GO_LOGGER, "failed to start go log fd reader for fd=$p0")
+        if (!started) Logger.w(LOG_TAG_BUG_REPORT, "failed to start go log fd reader for fd=$p0")
         return started
     }
 
@@ -113,17 +112,17 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
         fdb: Long,
         bufferSize: Long,
         size: Long
-    ): LogConsumer {
+    ): LogConsumer? {
         Logger.i(LOG_TAG_BUG_REPORT, "$TAG logMemFD: fd/a=$fda, fd/b=$fdb, buffer-sz=$bufferSize, sz: $size")
         // Return a GoMemLogConsumer that will drain the shared-memory buffer Go points us at.
         // Go will call drain(fd, start, end) on the returned consumer each time new data
         // is available, and onClose() when the writer is done.
-        return GoMemLogConsumer(ctx, scope, size.toInt())
+        return GoMemLogConsumer.getInstance(ctx, scope, fda, fdb, size.toInt())
     }
 
     private fun showNwEngineNotification(msg: String) {
         if (msg.isEmpty()) {
-            Logger.e(LOG_GO_LOGGER, "empty msg with log level set as user")
+            Logger.e(LOG_TAG_BUG_REPORT, "empty msg with log level set as user")
             return
         }
 
@@ -144,6 +143,6 @@ class GoReportingHandler private constructor(private val scope: CoroutineScope, 
                 .setAutoCancel(true)
         builder.color = ContextCompat.getColor(ctx, getAccentColor(persistentState.theme))
         notificationManager.notify(NW_ENGINE_NOTIFICATION_ID, builder.build())
-        Logger.w(LOG_TAG_VPN, "nw eng notification: $msg")
+        Logger.w(LOG_TAG_BUG_REPORT, "nw eng notification: $msg")
     }
 }

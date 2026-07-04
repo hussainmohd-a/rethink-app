@@ -60,11 +60,7 @@ import java.io.FileOutputStream
  * ```
  *
  */
-class GoMemLogConsumer(
-    private val appContext: Context,
-    private val scope: CoroutineScope,
-    private val slotSize: Int = 800
-) : LogConsumer {
+class GoMemLogConsumer(private val appContext: Context, private val scope: CoroutineScope, private val slotSize: Int) : LogConsumer {
 
     // Single-thread background dispatcher; all buffer processing is serialized here so
     // prevLogLevel and tombstoneStream need no additional synchronization.
@@ -89,6 +85,49 @@ class GoMemLogConsumer(
         private const val MAX_DRAIN_BYTES = 512 * 1024
 
         private val NEWLINE_BYTE: Byte = '\n'.code.toByte()
+
+        fun getInstance(appContext: Context?, scope: CoroutineScope?, fda: Long, fdb: Long, slotSize: Int): LogConsumer? {
+            if (appContext == null) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: appContext null")
+                return null
+            }
+            if (scope == null) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: scope null")
+                return null
+            }
+
+            // see if the fda can supports buffer IO, if not return null so that we can fallback
+            // to logFD
+            if (!supportsBufferedIO(fda.toInt())) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: fd=$fda does not support buffered IO")
+                return null
+            }
+
+            val goMem = GoMemLogConsumer(appContext, scope, slotSize)
+
+            scope.launch {
+                goMem.ensureTombstoneStreamReady()
+            }
+
+            return goMem
+        }
+
+        private fun getOrCreateFdWrapper(fd: Int): FileDescriptor? {
+            val fdWrapper = FileDescriptor()
+            if (!FdHelper.setFdInt(fdWrapper, fd, TAG)) return null
+            return fdWrapper
+        }
+
+        private fun supportsBufferedIO(fd: Int): Boolean {
+            return try {
+                val fdWrapper = getOrCreateFdWrapper(fd) ?: return false
+                val o = BufferedOutputStream(FileOutputStream(fdWrapper))
+                o.close()
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
     /**
