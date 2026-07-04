@@ -94,7 +94,7 @@ class AppWiseDomainLogsActivity :
         if (uid == INVALID_UID) {
             finish()
         }
-        val isRethink = Utilities.getApplicationInfo(this, this.packageName)?.uid == uid
+        val isRethink = android.os.Process.myUid() == uid
         init()
         if (isActiveConns) {
             setActiveConnsAdapter(isRethink)

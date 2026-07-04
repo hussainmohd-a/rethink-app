@@ -93,7 +93,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
     }
 
     private fun showStartVpnDialog() {
-        MaterialAlertDialogBuilder(this)
+        MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
             .setTitle(getString(R.string.vpn_not_active_dialog_title))
             .setMessage(getString(R.string.vpn_not_active_dialog_desc))
             .setCancelable(false)

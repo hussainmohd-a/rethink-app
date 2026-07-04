@@ -751,7 +751,7 @@ class ServerSettingsBottomSheet : BottomSheetDialogFragment() {
             if (it < 0) 0 else it  // fall back to random if stored value is unknown
         }
 
-        MaterialAlertDialogBuilder(requireContext())
+        MaterialAlertDialogBuilder(requireContext(), R.style.App_Dialog_NoDim)
             .setTitle(getString(R.string.server_settings_port_dialog_title))
             .setSingleChoiceItems(portLabels, selectedIndex) { dialog, which ->
                 val newPort = PORT_VALUES[which]

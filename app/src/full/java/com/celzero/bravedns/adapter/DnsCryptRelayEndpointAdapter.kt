@@ -199,7 +199,7 @@ class DnsCryptRelayEndpointAdapter(
         }
 
         private fun showDeleteDialog(id: Int) {
-            val builder = MaterialAlertDialogBuilder(context)
+            val builder = MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
             builder.setTitle(R.string.dns_crypt_relay_remove_dialog_title)
             builder.setMessage(R.string.dns_crypt_relay_remove_dialog_message)
             builder.setCancelable(true)

@@ -202,7 +202,7 @@ class DohEndpointAdapter(private val context: Context, private val appConfig: Ap
         }
 
         private fun showDohMetadataDialog(title: String, url: String, message: String?) {
-            val builder = MaterialAlertDialogBuilder(context)
+            val builder = MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
             builder.setTitle(title)
             builder.setMessage(url + "\n\n" + getDnsDesc(message))
             builder.setCancelable(true)
@@ -238,7 +238,7 @@ class DohEndpointAdapter(private val context: Context, private val appConfig: Ap
         }
 
         private fun showDeleteDnsDialog(id: Int) {
-            val builder = MaterialAlertDialogBuilder(context)
+            val builder = MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
             builder.setTitle(R.string.doh_custom_url_remove_dialog_title)
             builder.setMessage(R.string.doh_custom_url_remove_dialog_message)
             builder.setCancelable(true)

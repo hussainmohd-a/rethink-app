@@ -91,7 +91,7 @@ class AppWiseIpLogsActivity :
             finish()
         }
         init()
-        if (Utilities.getApplicationInfo(this, this.packageName)?.uid == uid) {
+        if (android.os.Process.myUid() == uid) {
             setRethinkAdapter()
         } else {
             if (isAsn) {

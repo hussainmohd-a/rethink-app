@@ -340,10 +340,9 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
 
     private fun removeThisMethod() {
 
-        val rethinkUid = Utilities.getApplicationInfo(this, this.packageName)?.uid
+        val rethinkUid = android.os.Process.myUid()
         io {
-            if (rethinkUid != null) FirewallManager.exemptRethinkApp(rethinkUid)
-            else Logger.e(LOG_TAG_UI, "HomeScreen Rethink UID is null")
+            FirewallManager.exemptRethinkApp(rethinkUid)
         }
 
         // change the persistent state for defaultDnsUrl, if its google.com (only for v055d)
