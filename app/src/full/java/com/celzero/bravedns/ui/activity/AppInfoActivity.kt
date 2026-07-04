@@ -154,10 +154,6 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
         b.aadRethinkWarningProceed.setOnClickListener {
             proceedWithInit()
         }
-
-        b.aadRethinkWarningGoBack.setOnClickListener {
-            finish()
-        }
     }
 
     private fun proceedWithInit() {
@@ -175,11 +171,9 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
     }
 
     private fun hideContentBehindWarning(hide: Boolean) {
-        val parent = b.aadRethinkWarningContainer.parent as? ViewGroup ?: return
         val visibility = if (hide) View.GONE else View.VISIBLE
-        for (i in 1 until parent.childCount) {
-            parent.getChildAt(i).visibility = visibility
-        }
+        b.aadAppParentRl.visibility = visibility
+
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
