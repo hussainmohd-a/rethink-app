@@ -39,6 +39,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * ViewModel for Rethink Plus subscription management
@@ -534,7 +535,7 @@ class RethinkPlusViewModel(application: Application) : AndroidViewModel(applicat
 
                 Logger.d(LOG_IAB, "$TAG: Polling pending purchase, elapsed: $elapsedTime ms")
                 InAppBillingHandler.fetchPurchases(listOf(ProductType.SUBS, ProductType.INAPP))
-                delay(POLLING_INTERVAL_MS)
+                delay(POLLING_INTERVAL_MS.milliseconds)
             }
         }
     }
@@ -550,9 +551,6 @@ class RethinkPlusViewModel(application: Application) : AndroidViewModel(applicat
 
     /**
      * Handle billing connection result.
-     * BUG FIX: previously only fetched purchases on connect, never queried product details →
-     * if the billing client was not yet ready when initializeBilling() ran, products were never
-     * loaded and the UI stayed in Loading forever.
      */
     fun onBillingConnected(isSuccess: Boolean, message: String) {
         if (!isSuccess) {
@@ -581,11 +579,16 @@ class RethinkPlusViewModel(application: Application) : AndroidViewModel(applicat
                     isBillingInitializing = false
                     withContext(Dispatchers.Main) {
                         _uiState.value = SubscriptionUiState.AlreadySubscribed(
-                            RpnProxyManager.getRpnProductId() ?: ""
+                            RpnProxyManager.getRpnProductId()
                         )
                     }
                     return@launch
                 }
+
+                // Fetch existing purchases to sync state machine, then query displayable products.
+                // regardless of availability, the previous purchases should be fetched and
+                // see if any active purchases are there
+                InAppBillingHandler.fetchPurchases(listOf(ProductType.SUBS, ProductType.INAPP))
 
                 // Check availability before querying products.
                 val avd = checkAvailability()
@@ -602,8 +605,6 @@ class RethinkPlusViewModel(application: Application) : AndroidViewModel(applicat
                     return@launch
                 }
 
-                // Fetch existing purchases to sync state machine, then query displayable products.
-                InAppBillingHandler.fetchPurchases(listOf(ProductType.SUBS, ProductType.INAPP))
                 InAppBillingHandler.queryProductDetailsWithTimeout()
                 // isBillingInitializing cleared by onProductsFetched
             }

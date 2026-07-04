@@ -39,6 +39,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * ViewModel for Rethink Plus subscription management
@@ -534,7 +535,7 @@ class RethinkPlusViewModel(application: Application) : AndroidViewModel(applicat
 
                 Logger.d(LOG_IAB, "$TAG: Polling pending purchase, elapsed: $elapsedTime ms")
                 InAppBillingHandler.fetchPurchases(listOf(ProductType.SUBS, ProductType.INAPP))
-                delay(POLLING_INTERVAL_MS)
+                delay(POLLING_INTERVAL_MS.milliseconds)
             }
         }
     }

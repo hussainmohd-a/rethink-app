@@ -220,14 +220,14 @@ class VpnServerAdapter(
             b.tvAppsCount.visibility = View.GONE
 
             if (group.key.equals(AUTO_SERVER_ID, ignoreCase = true)) {
-                b.infoIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_refresh))
-                b.infoIcon.visibility = View.VISIBLE
+                b.refreshStopIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_refresh))
+                b.refreshStopIcon.visibility = View.VISIBLE
                 // AUTO server: show the vector ic_rpn_auto, hide the emoji text view
                 b.tvFlag.text = ""
                 b.ivFlagImage.visibility = View.VISIBLE
             } else {
-                b.infoIcon.visibility = View.VISIBLE
-                b.infoIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_cross))
+                b.refreshStopIcon.visibility = View.VISIBLE
+                b.refreshStopIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_cross))
                 // Regular server: show the country flag emoji, hide the globe image
                 b.tvFlag.text = group.flagEmoji
                 b.ivFlagImage.visibility = View.GONE
@@ -287,20 +287,20 @@ class VpnServerAdapter(
                 // Redirect every tap to the settings sheet so the user can restart.
                 val stoppedClick = View.OnClickListener { listener.onProxyStoppedItemTapped() }
                 b.serverCard.setOnClickListener(stoppedClick)
-                b.infoIcon.setOnClickListener(stoppedClick)
+                b.refreshStopIcon.setOnClickListener(stoppedClick)
             } else if (loadingTunnelKeys.contains(group.key)) {
                 // WIN tunnel for this server is still being set up (getWinByKey returned null).
                 // Show a "Connecting…" indicator with a gentle pulse.
                 showTunnelLoadingStatus()
-                b.infoIcon.setOnClickListener {
-                    handleInfoIconClick(group)
+                b.refreshStopIcon.setOnClickListener {
+                    handleRefreshClick(group)
                 }
                 b.serverCard.setOnClickListener { openServerDetail(group.getBestServer()) }
                 // Always start polling
                 statsJob = pollStatsLoop(group)
             } else {
-                b.infoIcon.setOnClickListener {
-                    handleInfoIconClick(group)
+                b.refreshStopIcon.setOnClickListener {
+                    handleRefreshClick(group)
                 }
                 b.serverCard.setOnClickListener { openServerDetail(group.getBestServer()) }
 
@@ -310,13 +310,13 @@ class VpnServerAdapter(
             }
         }
 
-        private fun handleInfoIconClick(group: ServerGroup) {
+        private fun handleRefreshClick(group: ServerGroup) {
             if (group.key.equals(AUTO_SERVER_ID, ignoreCase = true)) {
                 io {
                     val startTime = System.currentTimeMillis()
                     var animator: ObjectAnimator? = null
                     uiCtx {
-                        animator = ObjectAnimator.ofFloat(b.infoIcon, "rotation", 0f, 360f).apply {
+                        animator = ObjectAnimator.ofFloat(b.refreshStopIcon, "rotation", 0f, 360f).apply {
                             duration = 600L
                             repeatCount = ValueAnimator.INFINITE
                             interpolator = LinearInterpolator()
@@ -324,7 +324,7 @@ class VpnServerAdapter(
                         }
                     }
                     try {
-                        VpnController.refreshRpnProxy(Backend.RpnWin)
+                        VpnController.reconnectRpnProxy("")
                     } finally {
                         val elapsed = System.currentTimeMillis() - startTime
                         if (elapsed < MIN_REFRESH_ANIM_MS) {
@@ -332,7 +332,7 @@ class VpnServerAdapter(
                         }
                         uiCtx {
                             animator?.cancel()
-                            b.infoIcon.rotation = 0f
+                            b.refreshStopIcon.rotation = 0f
                         }
                     }
                 }
@@ -441,8 +441,7 @@ class VpnServerAdapter(
                 val statusPair = VpnController.getProxyStatusById(id)
                 val stats = VpnController.getProxyStats(id)
 
-                // Fetch IP metadata for this server (cached by since-timestamp; live fetches
-                // only happen when the tunnel connects for the first time or after a reconnect).
+                // Fetch IP metadata for this server
                 val ip4 = fetchIpForGroup(group)
 
                 Logger.v(LOG_TAG_UI, "VpnServerAdapter fetchAndApplyStats for id: $id, config: $config, status: $statusPair, stats: $stats")
@@ -471,9 +470,7 @@ class VpnServerAdapter(
                 val client = withTimeoutOrNull(3_000L.milliseconds) {
                     runCatching { VpnController.getRpnClientInfoById(key) }.getOrNull()
                 }
-                val ip4 = runCatching { client?.iP4() }.getOrNull()
-                val ip6 = runCatching { client?.iP6() }.getOrNull()
-                ip4 ?: ip6
+                runCatching { client?.iP4() }.getOrNull()
             } catch (t: Throwable) {
                 Logger.w(LOG_TAG_UI, "VpnServerAdapter fetchIpForGroup[${group.key}]: ${t.message}")
                 null
