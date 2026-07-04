@@ -339,11 +339,6 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
     }
 
     private fun removeThisMethod() {
-
-        val rethinkUid = android.os.Process.myUid()
-        io {
-            FirewallManager.exemptRethinkApp(rethinkUid)
-        }
         persistentState.goMaxMemory = -1L
 
         // change the persistent state for defaultDnsUrl, if its google.com (only for v055d)
@@ -413,6 +408,7 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
     private fun updateNewVersion() {
         if (!isNewVersion()) return
 
+        val prevVersion = persistentState.appVersion
         // no need to show new settings on first time launch
         if (persistentState.appVersion != 0) {
             // if app version is not 0, then it means the app is updated
@@ -424,6 +420,15 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
         persistentState.appVersion = version
         persistentState.showWhatsNewChip = true
         persistentState.appUpdateTimeTs = System.currentTimeMillis()
+
+        // v055u, exempt rethink as the firewall rules is now stricter compared to prev versions.
+        // remove this if we have a proper ui to communicate those to users.
+        if (prevVersion <= 53) {
+            val rethinkUid = android.os.Process.myUid()
+            io {
+                FirewallManager.exemptRethinkApp(rethinkUid)
+            }
+        }
 
         // FIXME: remove this post v054
         removeThisMethod()
