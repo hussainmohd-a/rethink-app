@@ -5359,7 +5359,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         val rs = determineProxyDetails(cm,  rinr)
         if (cm.uid == rethinkUid) {
             val blockedRule = FirewallRuleset.getFirewallRule(cm.blockedByRule)?.title
-            if (blockedRule != null) {
+            if (cm.isBlocked && blockedRule != null) {
                 handleRethinkBlockScenario(blockedRule)
             }
         }
