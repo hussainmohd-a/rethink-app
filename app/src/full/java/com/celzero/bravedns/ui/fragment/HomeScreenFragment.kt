@@ -42,6 +42,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.ColorUtils
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.distinctUntilChanged
 import androidx.lifecycle.lifecycleScope
@@ -68,6 +69,7 @@ import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.service.WireguardManager
 import com.celzero.bravedns.service.WireguardManager.WG_UPTIME_THRESHOLD
 import com.celzero.bravedns.ui.activity.AlertsActivity
+import com.celzero.bravedns.ui.activity.AppInfoActivity
 import com.celzero.bravedns.ui.activity.AppListActivity
 import com.celzero.bravedns.ui.activity.ConfigureRethinkBasicActivity
 import com.celzero.bravedns.ui.activity.ConfigureRethinkBasicActivity.Companion.RETHINK_BLOCKLIST_NAME
@@ -134,6 +136,9 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
     private val batteryPermissionHelper = BatteryPermissionHelper.getInstance()
 
     private val appRulesMutex = Mutex()
+    private val rethinkUid = android.os.Process.myUid()
+    @Volatile
+    private var canRethinkBlockItself: Boolean = false
 
     companion object {
         private const val TAG = "HSFragment"
@@ -427,8 +432,26 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
             )
         }
 
+        b.fhsCardAppsTv.setOnClickListener {
+            openRethinkAppInfoIfNeeded()
+        }
+
+        b.fhsProtectionLevelTxt.setOnClickListener {
+            openRethinkAppInfoIfNeeded()
+        }
+
         // comment out the below code to disable the alerts card (v0.5.5b)
         // b.fhsCardAlertsLl.setOnClickListener { startActivity(ScreenType.ALERTS) }
+    }
+
+    private fun openRethinkAppInfoIfNeeded() {
+        if (canRethinkBlockItself) {
+            val intent = Intent(context, AppInfoActivity::class.java)
+            intent.putExtra(AppInfoActivity.INTENT_UID, rethinkUid)
+            startActivity(intent)
+        } else {
+            // no-op
+        }
     }
 
     private fun openRpnDashboardScreen() {
@@ -518,6 +541,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
             updateMainButtonUi()
             updateCardsUi()
             syncDnsStatus()
+            handleRethinkAppStatus()
         }
 
         VpnController.connectionStatus.observe(viewLifecycleOwner) {
@@ -1501,6 +1525,34 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         startTrafficStats()
         //maybeShowGracePeriodDialog()
         b.fhsSponsorBottom.bringToFront()
+        handleRethinkAppStatus()
+    }
+
+    private fun handleRethinkAppStatus() {
+        Logger.vv(LOG_TAG_UI, "handleRethinkAppStatus")
+        io {
+            if (isVpnActivated && shouldShowRethinkWarning()) {
+                canRethinkBlockItself = true
+                Logger.d(LOG_TAG_UI, "canRethinkBlockItself = true, showing warning")
+                uiCtx {
+                    val color = ColorUtils.setAlphaComponent(
+                        ContextCompat.getColor(requireContext(), R.color.accentBad),
+                        128 // 0-255 (128 = 50% opacity)
+                    )
+                    b.fhsCardAppsCv.strokeColor = color
+                    b.fhsCardAppsCv.strokeWidth = 2
+                    b.fhsCardAppsRethinkWarningTv?.visibility = View.VISIBLE
+                    b.fhsCardAppsRethinkWarningTv?.setTextColor(color)
+                }
+            } else {
+                canRethinkBlockItself = false
+                Logger.d(LOG_TAG_UI, "canRethinkBlockItself = false, hiding warning")
+                uiCtx {
+                    b.fhsCardAppsCv.strokeWidth = 0
+                    b.fhsCardAppsRethinkWarningTv?.visibility = View.GONE
+                }
+            }
+        }
     }
 
     private lateinit var trafficStatsTicker: Job
@@ -1521,7 +1573,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                         displayProtos()
                     }
                     // show protos
-                    kotlinx.coroutines.delay(TRAFFIC_DISPLAY_DELAY_MS)
+                    kotlinx.coroutines.delay(TRAFFIC_DISPLAY_DELAY_MS.milliseconds)
                     counter++
                 }
             }
@@ -1837,6 +1889,52 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         notificationPermissionResult.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
+    private suspend fun shouldShowRethinkWarning(): Boolean {
+        // show the warning in below cases:
+        // 1. Rethink is not excluded from proxy, and proxy enabled
+        // 2. Rethink is excluded from proxy, and proxy lockdown is enabled
+        // 3. Rethink is either blocked/isolated
+        // 4. Rethink is not bypassed(Universal), and universal firewall enabled
+        // 5. Rethink is not bypassed(Universal)
+
+        /*val loopback = persistentState.routeRethinkInRethink
+        if (!loopback) {
+            Logger.d(LOG_TAG_UI, "rethink is in loopback mode")
+            return false
+        }*/
+
+        val appInfo = FirewallManager.getAppInfoByUid(rethinkUid) ?: return false
+
+        val isProxyExcluded = appInfo.isProxyExcluded
+        val isProxyLockdown = persistentState.wgGlobalLockdown
+        val isAnyProxyActive = appConfig.isProxyEnabled() || RpnProxyManager.isRpnActive()
+        if (isProxyExcluded && isProxyLockdown) {
+            Logger.d(LOG_TAG_UI, "rethink is exempted from proxy but in proxy lockdown mode")
+            return true
+        }
+        if (!isProxyExcluded && isAnyProxyActive) {
+            Logger.d(LOG_TAG_UI, "rethink is not exempted from proxy but proxy is active, conns will be frwded to proxy")
+            return true
+        }
+        val firewallStatus = FirewallManager.FirewallStatus.getStatus(appInfo.firewallStatus)
+        val connStatus = FirewallManager.ConnectionStatus.getStatus(appInfo.connectionStatus)
+        val isRethinkBlockedOrIsolated = firewallStatus.isIsolate() || !connStatus.allow()
+        if (isRethinkBlockedOrIsolated) {
+            Logger.d(LOG_TAG_UI, "rethink is blocked or isolated")
+            return true
+        }
+        val isAppBypass = firewallStatus.bypassDnsFirewall() || firewallStatus.bypassUniversal()
+        val count =  persistentState.universalRulesCount.value
+        val isAnyUnivRulesEnabled = count != null && count > 0
+        if (!isAppBypass && isAnyUnivRulesEnabled) {
+            Logger.d(LOG_TAG_UI, "rethink is not bypassed, and universal firewall is enabled")
+            return true
+        }
+
+        Logger.vv(LOG_TAG_UI, "rethink app, no warning needed, proxyExcluded? $isProxyExcluded, proxyLockdown? $isProxyLockdown, isAnyProxyActive? $isAnyProxyActive, isRethinkBlockedOrIsolated? $isRethinkBlockedOrIsolated, isAppBypass? $isAppBypass, isAnyUnivRulesEnabled? $isAnyUnivRulesEnabled")
+        return false
+    }
+
     @Throws(ActivityNotFoundException::class)
     private fun prepareVpnService(): Boolean {
         val prepareVpnIntent: Intent? =
@@ -1930,6 +2028,11 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
 
     // Sets the UI DNS status on/off.
     private fun syncDnsStatus() {
+        if (canRethinkBlockItself) {
+            b.fhsProtectionLevelTxt.setTextColor(fetchTextColor(R.attr.accentWarning))
+            b.fhsProtectionLevelTxt.text = getString(R.string.rethink_home_screen_warning).lowercase()
+            return
+        }
         val vpnState = VpnController.state()
         // Change status and explanation text
         var statusId: Int
@@ -2126,6 +2229,9 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                 }
                 R.color.accentBad -> {
                     R.attr.accentBad
+                }
+                R.color.accentWarning -> {
+                    R.attr.accentWarning
                 }
                 else -> {
                     R.attr.colorOnSurfaceVariant

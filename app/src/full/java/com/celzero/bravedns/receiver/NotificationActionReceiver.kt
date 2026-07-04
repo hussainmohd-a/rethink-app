@@ -27,6 +27,7 @@ import com.celzero.bravedns.data.AppConfig
 import com.celzero.bravedns.database.RefreshDatabase
 import com.celzero.bravedns.service.FirewallManager
 import com.celzero.bravedns.service.FirewallManager.NOTIF_CHANNEL_ID_FIREWALL_ALERTS
+import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.OrbotHelper
@@ -42,6 +43,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
     private val appConfig by inject<AppConfig>()
     private val orbotHelper by inject<OrbotHelper>()
     private val rdb by inject<RefreshDatabase>()
+    private val persistentState by inject<PersistentState>()
 
     override fun onReceive(context: Context, intent: Intent) {
         // TODO - Move the NOTIFICATION_ACTIONs value to enum
@@ -99,6 +101,10 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
             }
             Constants.NOTIF_ACTION_DB_CORRUPTED_DISMISS -> {
                 manager.cancel(NOTIF_CHANNEL_ID_FIREWALL_ALERTS, RefreshDatabase.NOTIF_ID_DB_CORRUPTION)
+            }
+            Constants.NOTIF_ACTION_RETHINK_BLOCK_DISMISS -> {
+                manager.cancel(NOTIF_CHANNEL_ID_FIREWALL_ALERTS, Constants.NOTIF_ID_RETHINK_BLOCK)
+                persistentState.showRethinkBlockNotification = false
             }
         }
     }

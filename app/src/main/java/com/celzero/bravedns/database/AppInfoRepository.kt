@@ -157,12 +157,8 @@ class AppInfoRepository(private val appInfoDAO: AppInfoDAO) {
         return appInfoDAO.getAppInfoUidForPackageName(packageName)
     }
 
-    suspend fun setRethinkToBypassProxy(bypass: Boolean) {
-        appInfoDAO.setRethinkToBypassProxy(bypass)
-    }
-
-    suspend fun setRethinkToBypassDnsAndFirewall() {
-        appInfoDAO.setRethinkToBypassDnsAndFirewall()
+    suspend fun exemptRethinkApp() {
+        appInfoDAO.exemptRethinkApp()
     }
 
     /**

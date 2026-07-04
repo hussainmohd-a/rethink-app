@@ -23,12 +23,15 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.Process
 import android.text.format.DateUtils
 import android.view.View
+import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.TooltipCompat
 import androidx.core.content.ContextCompat
@@ -92,6 +95,13 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
     private var connStatus = FirewallManager.ConnectionStatus.ALLOW
 
     private var showBypassToolTip: Boolean = true
+    private var isWarningAcknowledged: Boolean = false
+
+    private val warningBackCallback = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() {
+            finish()
+        }
+    }
 
     companion object {
         const val INTENT_UID = "UID"
@@ -104,6 +114,7 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
         private const val MILLIS_PER_MINUTE = 60
         private const val MILLIS_PER_SECOND = 1000L
         private const val ALPHA_DISABLED = 0.5f
+        private const val IS_WARNING_ACKNOWLEDGED = "IS_WARNING_ACKNOWLEDGED"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,12 +129,62 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
 
         uid = intent.getIntExtra(INTENT_UID, INVALID_UID)
         Logger.d(LOG_TAG_UI, "AppInfoActivity, intent uid: $uid")
+        onBackPressedDispatcher.addCallback(this, warningBackCallback)
+
+        if (savedInstanceState?.getBoolean(IS_WARNING_ACKNOWLEDGED, false) == true) {
+            isWarningAcknowledged = true
+        }
+
+        if (shouldShowRethinkWarning()) {
+            showRethinkWarning()
+        } else {
+            proceedWithInit()
+        }
+    }
+
+    private fun shouldShowRethinkWarning(): Boolean {
+        return !isWarningAcknowledged && uid == Process.myUid()
+    }
+
+    private fun showRethinkWarning() {
+        b.aadRethinkWarningContainer.visibility = View.VISIBLE
+        warningBackCallback.isEnabled = true
+        hideContentBehindWarning(true)
+
+        b.aadRethinkWarningProceed.setOnClickListener {
+            proceedWithInit()
+        }
+
+        b.aadRethinkWarningGoBack.setOnClickListener {
+            finish()
+        }
+    }
+
+    private fun proceedWithInit() {
+        isWarningAcknowledged = true
+        b.aadRethinkWarningContainer.visibility = View.GONE
+        warningBackCallback.isEnabled = false
+        hideContentBehindWarning(false)
+
         ipRulesViewModel.setUid(uid)
         domainRulesViewModel.setUid(uid)
         networkLogsViewModel.setUid(uid)
         init()
         observeAppRules()
         setupClickListeners()
+    }
+
+    private fun hideContentBehindWarning(hide: Boolean) {
+        val parent = b.aadRethinkWarningContainer.parent as? ViewGroup ?: return
+        val visibility = if (hide) View.GONE else View.VISIBLE
+        for (i in 1 until parent.childCount) {
+            parent.getChildAt(i).visibility = visibility
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean(IS_WARNING_ACKNOWLEDGED, isWarningAcknowledged)
     }
 
     private fun observeAppRules() {

@@ -15,6 +15,7 @@ limitations under the License.
 */
 package com.celzero.bravedns.database
 
+import Logger.LOG_TAG_APP_DB
 import android.database.Cursor
 import androidx.paging.PagingSource
 import androidx.room.Dao
@@ -191,11 +192,8 @@ interface AppInfoDAO {
     @Query("select uid from AppInfo where packageName = :packageName")
     fun getAppInfoUidForPackageName(packageName: String): Int
 
-    @Query("update AppInfo set isProxyExcluded = :bypass where packageName = 'com.celzero.bravedns'")
-    fun setRethinkToBypassProxy(bypass: Boolean)
-
-    @Query("update AppInfo set firewallStatus = 7, connectionStatus = 3 where packageName = 'com.celzero.bravedns'")
-    fun setRethinkToBypassDnsAndFirewall()
+    @Query("update AppInfo set firewallStatus = 7, connectionStatus = 3, isProxyExcluded = 1 where packageName = 'com.celzero.bravedns'")
+    fun exemptRethinkApp()
 
     @Query("select * from AppInfo where tempAllowEnabled = 1 and tempAllowExpiryTime > 0")
     suspend fun getTempAllowedApps(): List<AppInfo>

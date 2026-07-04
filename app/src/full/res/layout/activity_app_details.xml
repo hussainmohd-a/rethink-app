@@ -13,6 +13,86 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
+        <androidx.appcompat.widget.LinearLayoutCompat
+            android:id="@+id/aad_rethink_warning_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="24dp"
+            android:background="?attr/colorSurface"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone">
+
+            <androidx.appcompat.widget.AppCompatImageView
+                android:layout_width="64dp"
+                android:layout_height="64dp"
+                android:src="@drawable/ic_loopback"
+                android:alpha="0.7"
+                android:contentDescription="@string/app_info_rethink_warning_title" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/aad_rethink_warning_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/app_info_rethink_warning_title"
+                android:textColor="?attr/primaryTextColor"
+                android:textSize="@dimen/extra_large_font_text_view"
+                android:textStyle="bold" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/aad_rethink_warning_desc"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:lineSpacingMultiplier="1.45"
+                android:text="@string/app_info_rethink_warning_desc"
+                android:textAlignment="center"
+                android:textColor="?attr/primaryLightColorText"
+                android:textSize="14sp" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/aad_rethink_warning_proceed"
+                style="@style/TextAppearance.AppCompat.Subhead"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:background="@drawable/rectangle_border_background"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center"
+                android:paddingStart="25dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="25dp"
+                android:paddingBottom="10dp"
+                android:text="@string/app_info_rethink_warning_proceed"
+                android:textColor="?attr/primaryTextColor"
+                android:textSize="@dimen/large_font_text_view" />
+
+            <androidx.appcompat.widget.AppCompatTextView
+                android:id="@+id/aad_rethink_warning_go_back"
+                style="@style/TextAppearance.AppCompat.Subhead"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingStart="20dp"
+                android:paddingTop="10dp"
+                android:paddingEnd="20dp"
+                android:paddingBottom="10dp"
+                android:text="@string/app_info_rethink_warning_go_back"
+                android:textColor="?attr/primaryLightColorText"
+                android:textSize="@dimen/default_font_text_view" />
+
+        </androidx.appcompat.widget.LinearLayoutCompat>
+
         <RelativeLayout
             android:id="@+id/aad_app_detail_rl"
             android:layout_width="match_parent"
@@ -474,71 +554,6 @@
                 </RelativeLayout>
 
             </androidx.appcompat.widget.LinearLayoutCompat>
-        </com.google.android.material.card.MaterialCardView>
-
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/aad_dns_card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_margin="8dp"
-            android:visibility="gone">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content">
-
-                <com.google.android.material.materialswitch.MaterialSwitch
-                    android:id="@+id/aad_dns_heading"
-                    style="@style/CustomWidget.Material3.CompoundButton.MaterialSwitch"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:fontFamily="sans-serif-smallcaps"
-                    android:gravity="center_vertical"
-                    android:paddingStart="20dp"
-                    android:paddingTop="10dp"
-                    android:paddingEnd="20dp"
-                    android:paddingBottom="10dp"
-                    android:text="@string/ada_app_dns_settings"
-                    android:textColor="?attr/secondaryTextColor"
-                    android:textSize="@dimen/large_font_text_view"
-                    android:textStyle="bold" />
-
-                <RelativeLayout
-                    android:id="@+id/aad_dns_rethink_rl"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_below="@id/aad_dns_heading">
-
-                    <androidx.appcompat.widget.AppCompatTextView
-                        android:id="@+id/aad_dns_rethink_stamp"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:layout_marginTop="10dp"
-                        android:layout_marginEnd="10dp"
-                        android:layout_marginBottom="10dp"
-                        android:layout_toStartOf="@id/aad_app_dns_rethink_configure"
-                        android:background="@drawable/text_view_background"
-                        android:drawablePadding="20dp"
-                        android:gravity="center"
-                        android:padding="10dp"
-                        android:textColor="?attr/primaryLightColorText"
-                        android:visibility="visible" />
-
-                    <androidx.appcompat.widget.AppCompatImageView
-                        android:id="@+id/aad_app_dns_rethink_configure"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_alignParentEnd="true"
-                        android:layout_centerVertical="true"
-                        android:layout_margin="10dp"
-                        android:src="@drawable/ic_configure" />
-
-                </RelativeLayout>
-
-            </RelativeLayout>
-
         </com.google.android.material.card.MaterialCardView>
 
         <RelativeLayout

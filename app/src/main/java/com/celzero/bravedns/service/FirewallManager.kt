@@ -431,7 +431,7 @@ object FirewallManager : KoinComponent {
                 }
             }
         }
-        db.tombstoneApp(newUid, uid, packageName, ts)
+        db.tombstoneApp(uid, newUid, packageName, ts)
         Logger.d(LOG_TAG_FIREWALL, "tombstone app: $packageName, uid: $uid, ts: $ts, newUid: $newUid")
         informObservers()
     }
@@ -980,7 +980,7 @@ object FirewallManager : KoinComponent {
             appInfo.isProxyExcluded = true
             appInfo.modifiedTs = System.currentTimeMillis()
         }
-        db.updateProxyExcluded(rethinkUid, true)
+        db.exemptRethinkApp()
     }
 
     suspend fun isAppExcludedFromProxy(uid: Int): Boolean {

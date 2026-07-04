@@ -216,6 +216,7 @@ class Constants {
         const val NOTIF_ACTION_NEW_APP_DENY = "NEW_APP_DENY" // deny network access for new apps
         const val NOTIF_ACTION_DB_CORRUPTED_CLEAR = "DB_CORRUPTED_CLEAR" // clear core tables and rebuild
         const val NOTIF_ACTION_DB_CORRUPTED_DISMISS = "DB_CORRUPTED_DISMISS" // dismiss db corruption notification
+        const val NOTIF_ACTION_RETHINK_BLOCK_DISMISS = "RETHINK_BLOCK_DISMISS" // dismiss rethink block notification
 
         // various notification intent extra name/values used part of notification's pending-intent
         const val NOTIF_INTENT_EXTRA_ACCESSIBILITY_NAME =
@@ -245,6 +246,8 @@ class Constants {
         const val NOTIF_INTENT_EXTRA_IAB_DEVICE_AUTH_ERROR_VALUE = "IAB_DEVICE_AUTH_ERROR_401"
         // Stable notification ID for the 401 auth-error alert (only one at a time)
         const val NOTIF_ID_IAB_DEVICE_AUTH_ERROR = 0x401
+
+        const val NOTIF_ID_RETHINK_BLOCK = 0x411
 
         // new app install intent extra name for uid. see RefreshDatabase#makeNewAppVpnIntent()
         const val NOTIF_INTENT_EXTRA_APP_UID = "NEW_APP_UID"

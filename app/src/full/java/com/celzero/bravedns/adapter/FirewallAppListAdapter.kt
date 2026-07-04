@@ -86,6 +86,8 @@ class FirewallAppListAdapter(
                     return oldConnection == newConnection
                 }
             }
+
+        private val rethinkUid = android.os.Process.myUid()
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AppListViewHolder {
@@ -142,7 +144,16 @@ class FirewallAppListAdapter(
                     } else {
                         b.firewallAppLabelTv.paint.isStrikeThruText = false
                     }
-                    displayConnectionStatus(appStatus, connStatus)
+                    if (appInfo.uid == rethinkUid) {
+                        // do not show the wi-fi and mobile data icons for RethinkDNS
+                        b.firewallAppToggleWifi.visibility = View.GONE
+                        b.firewallAppToggleMobileData.visibility = View.GONE
+                    } else {
+                        // show the wi-fi and mobile data icons for other apps
+                        b.firewallAppToggleWifi.visibility = View.VISIBLE
+                        b.firewallAppToggleMobileData.visibility = View.VISIBLE
+                        displayConnectionStatus(appStatus, connStatus)
+                    }
                     displayDataUsage(appInfo)
                     maybeDisplayProxyStatus(appInfo)
                 }
@@ -417,7 +428,7 @@ class FirewallAppListAdapter(
             connStatus: FirewallManager.ConnectionStatus
         ) {
 
-            val builderSingle = MaterialAlertDialogBuilder(context)
+            val builderSingle = MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
 
             builderSingle.setIcon(R.drawable.ic_firewall_block_grey)
             val count = packageList.count()
