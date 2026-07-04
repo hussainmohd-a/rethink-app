@@ -204,11 +204,13 @@ object IpRulesManager : KoinComponent {
     }
 
     private suspend fun updateRule(ci: CustomIp) {
-        Logger.i(LOG_TAG_FIREWALL, "ip rule, update: ${ci.ipAddress} for uid: ${ci.uid}; status: ${ci.status}")
         // ensure modified time is updated for ordering
         ci.modifiedDateTime = System.currentTimeMillis()
         db.update(ci)
-        val k = treeKey(ci.ipAddress)
+        val ipaddr = normalize(ci.getCustomIpAddress()?.first)
+        val k = treeKey(ipaddr)
+        Logger.i(LOG_TAG_FIREWALL, "ip rule, update: $ipaddr for uid: ${ci.uid}; status: ${ci.status}")
+
         if (!k.isNullOrEmpty()) {
             // escape old entries and add updated rule using ci.port (not android attr)
             iptree.escLike(k, treeValLike(ci.uid, ci.port))
@@ -266,14 +268,14 @@ object IpRulesManager : KoinComponent {
             }
         }
         getMostSpecificRuleMatch(uid, ipstr).let {
-            logv("ip rule for $uid $ipstr => ${it.name} ??")
+            logv("ip rule for $uid $ipstr => ${it.name}")
             if (it != IpRuleStatus.NONE) {
                 resultsCache.put(ck, it)
                 return it
             }
         }
         getMostSpecificRouteMatch(uid, ipstr, port).let {
-            logv("route rule for $uid $ipstr $port => ${it.name} ??")
+            logv("route rule for $uid $ipstr $port => ${it.name}")
             if (it != IpRuleStatus.NONE) {
                 resultsCache.put(ck, it)
                 return it
