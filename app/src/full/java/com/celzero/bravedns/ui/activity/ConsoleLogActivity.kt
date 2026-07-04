@@ -91,6 +91,7 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), SearchVi
         private const val QUERY_TEXT_DELAY: Long = 1000
         private const val CRASH_CODE = "**CRASH0**"
         private const val DONT_PANIC_CODE = "**CRASH1**"
+        private const val PANIC_CRASH_CODE = "**CRASH2**"
     }
 
     // Guard against rapid double-taps on share buttons while a job is in-progress
@@ -580,6 +581,9 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), SearchVi
             return true
         } else if (query == DONT_PANIC_CODE) {
             crashTun(1L)
+            return true
+        } else if (query == PANIC_CRASH_CODE) {
+            crashTun(2L)
             return true
         }
         searchQuery.value = query
