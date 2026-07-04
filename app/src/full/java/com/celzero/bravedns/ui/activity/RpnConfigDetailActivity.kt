@@ -45,6 +45,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.withRotation
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.transition.Visibility
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
 import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
@@ -245,7 +246,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         // Placeholder while we fetch from DB.
         b.configNameText.text = ""
         b.tvHeroCity.text = ""
-        b.tvHeroFlag.text = "\uD83C\uDF10" // globe
+        b.tvHeroFlag.visibility = View.GONE
         b.chipHeroStats.visibility = View.GONE
 
         // Show inline shimmer for client IPs (stats table is already visible).
@@ -263,12 +264,19 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
                 setupSsidSection(configKey)
                 // Banner.
                 if (config != null) {
-                    b.tvHeroFlag.text = config.flagEmoji
+                    if (configKey.equals(AUTO_SERVER_ID, true)) {
+                        b.tvHeroFlag.visibility = View.GONE
+                        b.ivHeroFlag.visibility = View.VISIBLE
+                    } else {
+                        b.ivHeroFlag.visibility = View.GONE
+                        b.tvHeroFlag.visibility = View.VISIBLE
+                        b.tvHeroFlag.text = config.flagEmoji
+                    }
                     b.configNameText.text = config.countryName
                     val city = config.city.ifBlank { config.serverLocation }
                     b.tvHeroCity.text = city.ifBlank { config.cc }
                 } else {
-                    b.tvHeroFlag.text = "\uD83C\uDF10"
+                    b.tvHeroFlag.visibility = View.GONE
                     b.configNameText.text = configKey.ifBlank { getString(R.string.lbl_server_config) }
                     b.tvHeroCity.text = ""
                 }
@@ -359,7 +367,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         fun styleLabel(start: Int, end: Int) {
             sb.setSpan(ForegroundColorSpan(labelColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             sb.setSpan(RelativeSizeSpan(0.80f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         fun appendLine(label: String, value: String) {
@@ -367,8 +374,8 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             sb.append("\n")
             val ls = sb.length
             sb.append(label)
+            sb.append(" · $value")
             styleLabel(ls, sb.length)
-            sb.append("  $value")
         }
 
         // addr
@@ -380,14 +387,10 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         sb.setSpan(TypefaceSpan("monospace"), addrStart, addrEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         sb.setSpan(RelativeSizeSpan(1.07f),   addrStart, addrEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
-        // loc
         val loc = if (info.city.isNotBlank() && info.cc.isNotBlank())
             "${info.city} (${info.cc})"
         else info.city.ifBlank { info.cc }
-        appendLine("Loc", loc)
-
-        // name
-        appendLine("Name", info.name)
+        appendLine(loc, info.name)
 
         return sb
     }
@@ -558,6 +561,14 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         b.valueLastOk.text = if (lastOK > 0L)
             DateUtils.getRelativeTimeSpanString(
                 lastOK, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
+            )
+        else getString(R.string.lbl_never)
+
+        val lastOpen = stats?.lastOpen ?: 0L
+        b.valueLastOpen.text = if (lastOK > 0L)
+            DateUtils.getRelativeTimeSpanString(
+                lastOpen, System.currentTimeMillis(),
                 DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
             )
         else getString(R.string.lbl_never)
