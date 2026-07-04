@@ -864,12 +864,14 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         otherSection("STATUS  (/proc/self/status)", status)
         otherSection("SMAPS  (/proc/self/smaps_rollup)", smaps)
         otherSection("AUXV  (/proc/self/auxv)", auxv)
-        otherSection("Memory Metrics", memMetrics)
 
         val clipText = buildString {
             appendLine("=== PROC / MEM ===")
             appendLine(otherSpan.toString())
             appendLine("=== METRICS ===")
+            appendLine("Memory Metrics")
+            appendLine(memMetrics)
+            appendLine()
             appendLine(formatedMetrics.orEmpty())
         }
 
@@ -912,7 +914,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         val procScrollView    = makeScrollableSpannable(otherSpan)
-        val metricsScrollView = makeScrollableText(formatedMetrics)
+        val metricsContent = buildString {
+            appendLine("Memory Metrics")
+            appendLine(memMetrics)
+            appendLine()
+            appendLine(formatedMetrics.orEmpty())
+        }
+        val metricsScrollView = makeScrollableText(metricsContent)
 
         val tabProc    = makeTabButton("Threads / Proc / Mem")
         val tabMetrics = makeTabButton("Metrics")

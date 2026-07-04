@@ -176,7 +176,7 @@ object MemoryUtils {
         sb.appendLine("System Status:")
         sb.appendLine("   RAM Free: ${stats.systemAvailableRam} / ${stats.systemTotalRam}")
         sb.appendLine("   Is Low Memory: ${stats.isLowMemory}")
-        sb.appendLine("   CPU Cores: ${stats.coreCount}")
+        sb.appendLine("   CPU Cores: ${stats.coreCount}\n")
         return sb.toString()
     }
 
