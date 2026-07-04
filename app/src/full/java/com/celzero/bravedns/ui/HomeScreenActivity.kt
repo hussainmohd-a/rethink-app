@@ -344,6 +344,7 @@ class HomeScreenActivity : BaseActivity(R.layout.activity_home_screen) {
         io {
             FirewallManager.exemptRethinkApp(rethinkUid)
         }
+        persistentState.goMaxMemory = -1L
 
         // change the persistent state for defaultDnsUrl, if its google.com (only for v055d)
         // TODO: remove this post v054.
