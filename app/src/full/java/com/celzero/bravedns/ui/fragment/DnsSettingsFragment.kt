@@ -673,7 +673,7 @@ class DnsSettingsFragment : Fragment(R.layout.fragment_dns_configure),
             )
         }
 
-        b.dcBlockUnknownHeading.setOnClickListener { b.dcBlockUnknownSwitch.isChecked = !b.dcBlockUnknownSwitch.isChecked }
+        b.dcBlockHeadingRl.setOnClickListener { b.dcBlockUnknownSwitch.isChecked = !b.dcBlockUnknownSwitch.isChecked }
     }
 
     private fun showBlockFreeDnsModeBottomSheet() {
