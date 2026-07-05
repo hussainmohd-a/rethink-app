@@ -76,8 +76,6 @@ internal constructor(
 
     fun processOnResponse(summary: DNSSummary): Transaction {
         val latencyMs = (TimeUnit.SECONDS.toMillis(1L) * summary.latency).toLong()
-        val nowMs = SystemClock.elapsedRealtime()
-        val queryTimeMs = nowMs - summary.start
         var uid = INVALID_UID
 
         try {
@@ -93,7 +91,7 @@ internal constructor(
         transaction.type = summary.qType
         transaction.uid = uid
         transaction.id = summary.id
-        transaction.queryTime = queryTimeMs
+        transaction.queryTime = summary.start
         transaction.transportType = Transaction.TransportType.getType(summary.type)
         transaction.response = summary.rData ?: ""
         transaction.responseCode = summary.rCode
@@ -130,7 +128,7 @@ internal constructor(
         dnsLog.responseTime = transaction.latency
         dnsLog.serverIP = transaction.serverName
         dnsLog.status = transaction.status.name
-        dnsLog.time = transaction.responseCalendar.timeInMillis
+        dnsLog.time = transaction.queryTime
         dnsLog.ttl = transaction.ttl
         dnsLog.msg = transaction.msg
         dnsLog.upstreamBlock = transaction.upstreamBlock
