@@ -91,9 +91,8 @@ class GoLogFileDescriptorReader(
         val ownedFd = FdHelper.duplicate(fd, TAG) ?: return false
         Logger.d(LOG_TAG_BUG_REPORT, "$TAG start: fd duplicated, launching read loop")
 
-        createCrashFile()
-
         scope.launch(CoroutineName("goLogFd") + dispatcher) {
+            createCrashFile()
             readLoop(ownedFd)
         }
         return true

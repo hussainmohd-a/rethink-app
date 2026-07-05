@@ -27,7 +27,7 @@ object NewSettingsManager: KoinComponent {
 
     private const val EXPIRY_DAYS = 7
 
-    private val newSettingsList = listOf ("")
+    private val newSettingsList = emptyList<String>()
 
     init {
         handleNewSettings()

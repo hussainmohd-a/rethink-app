@@ -762,8 +762,8 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     // the version of the guided tour that was last shown; used to re-trigger on UI changes
     var guidedTourVersion by intPref("guided_tour_version").withDefault<Int>(0)
 
-    // maximum memory the go engine can consume in bytes
-    var goMaxMemory by longPref(GO_MAX_MEMORY).withDefault<Long>(-1 * 1024 * 1024L)
+    // maximum memory the go engine can consume in bytes (ideally value*1024*1024)
+    var goMaxMemory by longPref(GO_MAX_MEMORY).withDefault<Long>(-1L)
 
     var blockDnsForUnknownApp by booleanPref("block_dns_for_unknown_app").withDefault<Boolean>(false)
 
