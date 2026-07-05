@@ -1637,7 +1637,6 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
             io("appObsrver") {
                 try {
                     var latestExcludedApps: Set<String>
-                    // replace synchronized block with mutex
                     excludeAppsMutex.withLock {
                         val copy: List<AppInfo> = mutableListOf<AppInfo>().apply { addAll(t) }
                         latestExcludedApps =
