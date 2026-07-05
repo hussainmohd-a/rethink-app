@@ -363,7 +363,7 @@ object IpRulesManager : KoinComponent {
                     logv("getMostSpecificRuleMatch: $uid, $k, $vlike => treeVal is null for $it")
                     return@forEach
                 }
-                if (treeVal.uid == uid && treeVal.port == port) {
+                if (treeVal.uid == uid && treeVal.port == port && treeVal.status != IpRuleStatus.NONE) {
                     logv("getMostSpecificRuleMatch: $uid, $k, $vlike($it) => status ${treeVal.status}")
                     return treeVal.status
                 }
@@ -435,7 +435,7 @@ object IpRulesManager : KoinComponent {
                     logv("getMostSpecificRouteMatch: $uid, $k, $vlike => treeVal is null for $it")
                     return@forEach
                 }
-                if (treeVal.uid == uid && treeVal.port == port) {
+                if (treeVal.uid == uid && treeVal.port == port && treeVal.status != IpRuleStatus.NONE) {
                     logv("getMostSpecificRouteMatch: $uid, $k, $vlike => found match for $it")
                     return treeVal.status
                 }
