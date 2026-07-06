@@ -59,8 +59,8 @@ private constructor(val host: String, private val isResolved: Boolean, val port:
     suspend fun getResolved(): Optional<InetEndpoint> {
         if (isResolved) return Optional.of(this)
         return mutex.withLock {
-            // TODO(zx2c4): Implement a real timeout mechanism using DNS TTL
-            if (Duration.between(lastResolution, Instant.now()).toMinutes() > 1) {
+            // TODO: Implement a real timeout mechanism using DNS TTL
+            if (Duration.between(lastResolution, Instant.now()).toSeconds() > 5) {
                 withContext(Dispatchers.IO) {
                     try {
                         // Prefer v4 endpoints over v6 to work around DNS64 and IPv6 NAT issues.
@@ -74,7 +74,7 @@ private constructor(val host: String, private val isResolved: Boolean, val port:
                         }
                         resolved = InetEndpoint(address.hostAddress ?: "", true, port)
                         lastResolution = Instant.now()
-                    } catch (e: UnknownHostException) {
+                    } catch (_: UnknownHostException) {
                         resolved = null
                     }
                 }
