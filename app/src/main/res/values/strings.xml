@@ -131,6 +131,10 @@
 
     <string name="memory_notification_text">Rethink is experiencing low memory. System actions may be limited.</string>
 
+    <string name="rethink_block_notification_title" translatable="false">Rethink blocked its own traffic</string>
+    <string name="rethink_block_notification_desc" translatable="false">Rethink is blocked by the "%1$s" rule.</string>
+    <string name="rethink_block_notification_action_dismiss" translatable="false">Don\'t show again</string>
+
     <string name="symbol_upload" translatable="false">%1$s 🔺</string>
     <string name="symbol_download" translatable="false">%1$s 🔻</string>
     <string name="single_argument" translatable="false">%1$s</string>
@@ -608,6 +612,11 @@
     <string name="settings_rinr_btmsht_desc" translatable="true">In Loopback mode, Rethink can reroute its own network traffic. This means, Rethink can apply IP and domain rules, universal firewall rules, and proxying rules on Rethink\'s traffic as if it were any other regular app. Even so Loopback offers more control, the resulting behavior may not always desirable.\n\n\nIt is recommended to exempt Rethink from firewall, DNS, and proxying rules. Doing so doesn\'t affect network monitoring or logging, but just the rules.\n\n\nIn Loopback mode, Proxy Lockdown will not be enforced, for now.</string>
     <string name="settings_rinr_exempt_btn" translatable="true">Exempt Rethink</string>
 
+    <string name="app_info_rethink_warning_title" translatable="true">Caution</string>
+    <string name="app_info_rethink_warning_desc" translatable="true">You are about to change firewall rules for Rethink. Since Rethink manages the VPN tunnel, allowing, blocking, or isolating its own traffic can break network access across the board.</string>
+    <string name="app_info_rethink_warning_proceed" translatable="true">I understand</string>
+    <string name="rethink_home_screen_warning" translatable="true">may affect connectivity ⚠️</string>
+
     <string name="settings_gologger_dialog_option_0" translatable="false">Very verbose</string>
     <string name="settings_gologger_dialog_option_1" translatable="false">Verbose</string>
     <string name="settings_gologger_dialog_option_2" translatable="false">Debug</string>
@@ -790,6 +799,8 @@
 
     <string name="dc_block_heading" translatable="true">Rules</string>
     <string name="dc_other_dns_heading" translatable="true">Type</string>
+
+    <string name="dc_global_heading" translatable="true">Global</string>
 
     <string name="dc_custom_dns_radio" translatable="true">Other DNS</string>
     <string name="dc_rethink_dns_radio" translatable="true">Rethink DNS</string>
@@ -1185,6 +1196,11 @@
     <string name="rules_load_failure_desc" translatable="true">No firewall rules found</string>
     <string name="rules_load_failure_reload" translatable="true">reload</string>
 
+    <string name="db_corruption_notif_title" translatable="false">Database Error</string>
+    <string name="db_corruption_notif_desc" translatable="false">The app database appears to be corrupted. Rebuilding the database will restore functionality but may reset some app settings to default.</string>
+    <string name="db_corruption_action_clear" translatable="false">Clear &amp; Rebuild</string>
+    <string name="db_corruption_action_dismiss" translatable="false">Dismiss</string>
+
     <string name="network_log_app_name_unknown" translatable="true">Unknown</string>
     <string name="network_log_app_name_unnamed" translatable="true">Unnamed (%1$s)</string>
 
@@ -1340,6 +1356,7 @@
     <string name="build__flavor_website" translatable="true">website</string>
     <string name="build__flavor_play_store" translatable="true">play</string>
     <string name="build__flavor_fdroid" translatable="true">fdroid</string>
+    <string name="build_flavor_website_degoogled" translatable="true">website-degoogled</string>
 
     <!-- custom domain -->
     <string name="cd_toast_deleted" translatable="true">Domain removed from custom list</string>
@@ -1966,6 +1983,12 @@
     <string name="firewall_bubble_text" translatable="false">Tap to view recently blocked apps</string>
     <string name="firewall_bubble_permission_granted_toast" translatable="false">Firewall Bubble enabled</string>
     <string name="firewall_bubble_permission_denied_toast" translatable="false">Permission denied. Firewall Bubble disabled.</string>
+    <string name="firewall_bubble_action_disable" translatable="false">Disable</string>
+    <string name="firewall_bubble_action_enable_bubbles" translatable="false">Enable bubbles</string>
+    <string name="firewall_bubble_notification_permission_toast" translatable="false">Notification permission is required for the Firewall Bubble</string>
+    <string name="firewall_bubble_vpn_off_toast" translatable="false">Firewall Bubble will appear when the VPN is running</string>
+    <string name="firewall_bubble_not_allowed_toast" translatable="false">Bubbles are not allowed. Enable them in system settings to use this feature.</string>
+    <string name="firewall_bubble_enable_prompt_text" translatable="false">Tap to enable bubbles in system settings</string>
 
     <string name="bubble_activity_title" translatable="false">Recently Blocked Apps</string>
     <string name="bubble_empty_state_title" translatable="false">No Blocked Apps</string>
@@ -2324,9 +2347,10 @@
 
     <!-- ServerWgConfigDetailActivity live stats card -->
     <string name="lbl_last_handshake" translatable="false">Last Handshake</string>
+    <string name="lbl_last_open" translatable="false">Last Reconnect</string>
     <string name="lbl_errors" translatable="false">Errors</string>
-    <string name="lbl_client_ipv4" translatable="false">Client IPv4</string>
-    <string name="lbl_client_ipv6" translatable="false">Client IPv6</string>
+    <string name="lbl_client_ipv4" translatable="false">Client Info</string>
+    <string name="lbl_server_info" translatable="false">Server Info</string>
     <string name="lbl_never" translatable="false">Never</string>
 
     <!-- Emoji icons used in the privacy exposure card -->
@@ -2490,7 +2514,7 @@
     <string name="fs_configure_logs_desc" translatable="true">Review DNS queries and connection logs</string>
 
     <!-- DNS bypass mode bottom sheet -->
-    <string name="bfdm_heading" translatable="false">DNS to bypass</string>
+    <string name="bfdm_heading" translatable="false">DNS for bypass</string>
     <string name="bfdm_desc" translatable="false">Select the DNS to use for trusted and bypassed apps and domains</string>
     <string name="bfdm_option_fallback_label" translatable="false">Use fallback DNS</string>
     <string name="bfdm_option_fallback_desc" translatable="false">Use the fallback DNS for trusted and bypassed connections</string>
@@ -2500,5 +2524,7 @@
     <string name="bfdm_option_auto_desc" translatable="false">Automatically select DNS based on other settings</string>
 
     <string name="console_log_include_file_trace" translatable="false">Include file trace in logs</string>
+
+    <string name="rethink_block_error_desc" translatable="false">Rethink may be blocked by firewall rules ⚠</string>
 
 </resources>

@@ -35,6 +35,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
+import com.bumptech.glide.RequestBuilder
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.target.CustomViewTarget
@@ -75,6 +76,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
     private var _binding: BottomSheetDnsLogBinding? = null
@@ -155,7 +157,7 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
             b.dnsBlockedTarget.visibility = View.VISIBLE
         }
         if (Logger.LoggerLevel.fromId(persistentState.goLoggerLevel.toInt())
-                ?.isLessThan(Logger.LoggerLevel.DEBUG) == true
+                ?.isLessThanOrEqualTo(Logger.LoggerLevel.DEBUG) == true
         ) {
             b.dnsMessage.text = "${log?.msg}; ${log?.proxyId}; ${log?.relayIP}"
         } else {
@@ -186,7 +188,7 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
 
         // Defer favicon loading even more (lowest priority, can be slow)
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(150) // Let basic UI settle first
+            kotlinx.coroutines.delay(150.milliseconds) // Let basic UI settle first
             displayFavIcon()
         }
     }
@@ -618,6 +620,8 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun displayFavIcon() {
+        if (!isAdded) return
+
         val currentLog = log
         if (currentLog == null) {
             Logger.w(LOG_TAG_DNS, "Transaction detail missing, no need to update ui")
@@ -650,14 +654,19 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
         try {
             Logger.d(LOG_TAG_DNS, "Glide, TransactionViewHolder lookupForImageNextDns :$url")
             val factory = DrawableCrossFadeFactory.Builder().setCrossFadeEnabled(true).build()
-            Glide.with(requireContext().applicationContext)
+            var request = Glide.with(requireContext().applicationContext)
                 .load(url)
                 .onlyRetrieveFromCache(true)
                 .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
                 .timeout(2000) // Prevent hanging - fail fast if cache lookup is slow
-                .error(lookupForImageDuckduckgo(duckduckgoUrl, duckduckgoDomainURL))
                 .transition(DrawableTransitionOptions.withCrossFade(factory))
-                .into(
+
+            val errorRequest = lookupForImageDuckduckgo(duckduckgoUrl, duckduckgoDomainURL)
+            if (errorRequest != null) {
+                request = request.error(errorRequest)
+            }
+
+            request.into(
                     object : CustomViewTarget<ImageView, Drawable>(b.dnsBlockFavIcon) {
                         override fun onLoadFailed(errorDrawable: Drawable?) {
                             if (!isAdded) return
@@ -688,12 +697,40 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
                 )
         } catch (e: Exception) {
             Logger.d(LOG_TAG_DNS, "Glide - TransactionViewHolder Exception() -${e.message}")
-            lookupForImageDuckduckgo(duckduckgoUrl, duckduckgoDomainURL)
+            lookupForImageDuckduckgo(duckduckgoUrl, duckduckgoDomainURL)?.into(
+                object : CustomViewTarget<ImageView, Drawable>(b.dnsBlockFavIcon) {
+                    override fun onLoadFailed(errorDrawable: Drawable?) {
+                        if (!isAdded) return
+
+                        b.dnsBlockFavIcon.visibility = View.GONE
+                    }
+
+                    override fun onResourceReady(
+                        resource: Drawable,
+                        transition: Transition<in Drawable>?
+                    ) {
+                        Logger.d(
+                            LOG_TAG_DNS,
+                            "Glide - CustomViewTarget onResourceReady() duckduckgo: $url"
+                        )
+                        if (!isAdded) return
+
+                        b.dnsBlockFavIcon.visibility = View.VISIBLE
+                        b.dnsBlockFavIcon.setImageDrawable(resource)
+                    }
+
+                    override fun onResourceCleared(placeholder: Drawable?) {
+                        if (!isAdded) return
+
+                        b.dnsBlockFavIcon.visibility = View.GONE
+                    }
+                }
+            )
         }
     }
 
-    private fun lookupForImageDuckduckgo(url: String, domainUrl: String) {
-        try {
+    private fun lookupForImageDuckduckgo(url: String, domainUrl: String): RequestBuilder<Drawable>? {
+        return try {
             Logger.d(
                 LOG_TAG_DNS,
                 "Glide - TransactionViewHolder lookupForImageDuckduckgo: $url, $domainUrl"
@@ -711,40 +748,8 @@ class DnsBlocklistBottomSheet : BottomSheetDialogFragment() {
                         .timeout(2000)
                 )
                 .transition(DrawableTransitionOptions.withCrossFade(factory))
-                .into(
-                    object : CustomViewTarget<ImageView, Drawable>(b.dnsBlockFavIcon) {
-                        override fun onLoadFailed(errorDrawable: Drawable?) {
-                            if (!isAdded) return
-
-                            b.dnsBlockFavIcon.visibility = View.GONE
-                        }
-
-                        override fun onResourceReady(
-                            resource: Drawable,
-                            transition: Transition<in Drawable>?
-                        ) {
-                            Logger.d(
-                                LOG_TAG_DNS,
-                                "Glide - CustomViewTarget onResourceReady() -$url"
-                            )
-                            if (!isAdded) return
-
-                            b.dnsBlockFavIcon.visibility = View.VISIBLE
-                            b.dnsBlockFavIcon.setImageDrawable(resource)
-                        }
-
-                        override fun onResourceCleared(placeholder: Drawable?) {
-                            if (!isAdded) return
-
-                            b.dnsBlockFavIcon.visibility = View.GONE
-                        }
-                    }
-                )
         } catch (e: Exception) {
-            Logger.d(LOG_TAG_DNS, "Glide - TransactionViewHolder Exception() -${e.message}")
-            if (!isAdded) return
-
-            b.dnsBlockFavIcon.visibility = View.GONE
+            null
         }
     }
 

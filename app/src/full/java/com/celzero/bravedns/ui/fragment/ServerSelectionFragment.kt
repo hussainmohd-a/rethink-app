@@ -18,6 +18,9 @@ package com.celzero.bravedns.ui.fragment
 import Logger
 import Logger.LOG_TAG_UI
 import android.animation.ObjectAnimator
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context.CLIPBOARD_SERVICE
 import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
@@ -27,6 +30,7 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.getSystemService
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -76,6 +80,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.toString
 
 /**
  * Fragment for selecting VPN servers from a list.
@@ -136,6 +141,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
      * row emits (e.g. on a background refresh while the screen is visible).
      */
     private var resubscribePromptShown = false
+    private var winIdentifier: String? = null
 
     companion object {
         private const val TAG = "ServerSelectionFragment"
@@ -769,7 +775,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         // cache so the IO path only fires on reconnect (since change) or first load.
         statusUpdateJob = lifecycleScope.launch {
             while (true) {
-                delay(3_000)
+                delay(3_000.milliseconds)
                 if (isAdded && !isLoading) {
                     updateConnectionStatusOnly()
                 }
@@ -805,9 +811,20 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         io {
             val realDeviceId = runCatching { InAppBillingHandler.getObfuscatedDeviceId() }.getOrDefault("")
             val deviceId = realDeviceId.take(4)
+            if (winIdentifier.isNullOrEmpty()) {
+                winIdentifier = VpnController.getWinIdentifier()
+            }
+            val who = winIdentifier
             uiCtx {
                 if (!isAdded) return@uiCtx
                 b.tvHeroAccountId.text = if (accountId.isNotEmpty()) "$accountId • $deviceId" else ""
+
+                if (who.isNullOrEmpty()) {
+                    b.tvHeroWho.visibility = View.GONE
+                } else {
+                    b.tvHeroWho.visibility = View.VISIBLE
+                    b.tvHeroWho.text = who
+                }
             }
         }
     }
@@ -936,6 +953,17 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             } else {
                 showServerSettingsBottomSheet()
             }
+        }
+        b.tvHeroWho.setOnClickListener {
+            val text = b.tvHeroWho.text?.toString().orEmpty()
+            if (text.isBlank()) return@setOnClickListener
+            val clipboard = requireContext().getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("who", text))
+            Utilities.showToastUiCentered(
+                requireContext(),
+                getString(R.string.copied_clipboard),
+                Toast.LENGTH_SHORT
+            )
         }
     }
 
@@ -2194,7 +2222,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         timeoutBar.max = LOADING_DIALOG_TIMEOUT_MS.toInt()
         timeoutBar.setProgressCompat(0, false)
 
-        val dialog = MaterialAlertDialogBuilder(requireContext())
+        val dialog = MaterialAlertDialogBuilder(requireContext(), R.style.App_Dialog_NoDim)
             .setView(dialogView)
             .setCancelable(true)
             .create()

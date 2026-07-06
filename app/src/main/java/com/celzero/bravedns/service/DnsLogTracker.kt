@@ -74,20 +74,12 @@ internal constructor(
         vpnStateMap[Transaction.Status.INTERNAL_ERROR] = BraveVPNService.State.APP_ERROR
     }
 
-    fun processOnResponse(summary: DNSSummary, rethinkUid: Int): Transaction {
+    fun processOnResponse(summary: DNSSummary): Transaction {
         val latencyMs = (TimeUnit.SECONDS.toMillis(1L) * summary.latency).toLong()
-        val nowMs = SystemClock.elapsedRealtime()
-        val queryTimeMs = nowMs - latencyMs
         var uid = INVALID_UID
 
         try {
-            uid = if (summary.uid == Backend.UidSelf) {
-                rethinkUid
-            } else if (summary.uid == Backend.UidSystem) {
-                AndroidUidConfig.SYSTEM.uid // 1000
-            } else {
-                summary.uid.toInt()
-            }
+            uid = summary.uid.toInt()
         } catch (_: NumberFormatException) {
             Logger.w(LOG_TAG_VPN, "onQuery: invalid uid: ${summary.uid}, using default uid: $uid")
         }
@@ -99,7 +91,7 @@ internal constructor(
         transaction.type = summary.qType
         transaction.uid = uid
         transaction.id = summary.id
-        transaction.queryTime = queryTimeMs
+        transaction.queryTime = summary.start
         transaction.transportType = Transaction.TransportType.getType(summary.type)
         transaction.response = summary.rData ?: ""
         transaction.responseCode = summary.rCode
@@ -111,7 +103,7 @@ internal constructor(
         transaction.blocklist = summary.blocklists ?: ""
         transaction.relayName = summary.rpid ?: ""
         transaction.proxyId = summary.pid ?: ""
-        transaction.msg = summary.origin + "; " + summary.msg + "; " + summary.extra
+        transaction.msg = summary.fid + "; " +summary.origin + "; " + summary.msg + "; " + summary.extra
         transaction.upstreamBlock = summary.upstreamBlocks
         transaction.region = summary.region
         transaction.isCached = summary.cached
@@ -136,7 +128,7 @@ internal constructor(
         dnsLog.responseTime = transaction.latency
         dnsLog.serverIP = transaction.serverName
         dnsLog.status = transaction.status.name
-        dnsLog.time = transaction.responseCalendar.timeInMillis
+        dnsLog.time = transaction.queryTime
         dnsLog.ttl = transaction.ttl
         dnsLog.msg = transaction.msg
         dnsLog.upstreamBlock = transaction.upstreamBlock

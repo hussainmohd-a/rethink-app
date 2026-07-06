@@ -269,8 +269,7 @@ class FirewallAppListAdapterTest {
             FirewallManager.FirewallStatus.EXCLUDE,
             FirewallManager.FirewallStatus.ISOLATE,
             FirewallManager.FirewallStatus.BYPASS_UNIVERSAL,
-            FirewallManager.FirewallStatus.BYPASS_DNS_FIREWALL,
-            FirewallManager.FirewallStatus.UNTRACKED
+            FirewallManager.FirewallStatus.BYPASS_DNS_FIREWALL
         )
 
         var processedCount = 0

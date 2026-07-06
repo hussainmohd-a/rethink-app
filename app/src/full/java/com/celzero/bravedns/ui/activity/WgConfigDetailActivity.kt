@@ -21,8 +21,15 @@ import Logger.LOG_TAG_UI
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Typeface
 import android.os.Bundle
+import android.text.SpannableStringBuilder
+import android.text.Spanned
 import android.text.format.DateUtils
+import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
+import android.text.style.StyleSpan
+import android.text.style.TypefaceSpan
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -33,6 +40,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
+import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
 import com.celzero.bravedns.adapter.WgIncludeAppsAdapter
 import com.celzero.bravedns.adapter.WgPeersAdapter
 import com.celzero.bravedns.data.SsidItem
@@ -74,13 +82,18 @@ import com.celzero.bravedns.wireguard.Config
 import com.celzero.bravedns.wireguard.Peer
 import com.celzero.bravedns.wireguard.WgHopManager
 import com.celzero.bravedns.wireguard.WgInterface
+import com.celzero.firestack.backend.IPMetadata
 import com.celzero.firestack.backend.RouterStats
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import java.util.Locale
+import kotlin.time.Duration.Companion.milliseconds
 
 class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
     private val b by viewBinding(ActivityWgDetailBinding::bind)
@@ -96,6 +109,9 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
     private var wgInterface: WgInterface? = null
     private val peers: MutableList<Peer> = mutableListOf()
     private var wgType: WgType = WgType.DEFAULT
+
+    /** Coroutine that polls VpnController every [STATS_POLL_MS] ms. */
+    private var statsJob: Job? = null
 
     // SSID permission handling
     private val ssidPermissionCallback = object : SsidPermissionManager.PermissionCallback {
@@ -128,6 +144,9 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
     companion object {
         private const val CLIPBOARD_PUBLIC_KEY_LBL = "Public Key"
         const val INTENT_EXTRA_WG_TYPE = "WIREGUARD_TUNNEL_TYPE"
+
+        /** Polling interval for live stats. */
+        private const val STATS_POLL_MS = 2_000L
     }
 
     enum class WgType(val value: Int) {
@@ -167,6 +186,12 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
         super.onResume()
         init()
         setupClickListeners()
+        startStatsPolling(configId)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        cancelStatsJob()
     }
 
     override fun onRequestPermissionsResult(
@@ -295,6 +320,13 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
         io { updateStatusUi(config.getId()) }
         prefillConfig(config)
         refreshHopStatus()
+        if (persistentState.downloadIpInfo && mapping?.isActive == true) {
+            resolveClientIps(configId)
+        } else {
+            b.shimmerClientInfo.stopShimmer()
+            b.shimmerClientInfo.visibility = View.GONE
+            b.rowClientInfo.visibility = View.GONE
+        }
     }
 
     private suspend fun updateStatusUi(id: Int) {
@@ -310,13 +342,12 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
                 null
             }
             uiCtx {
-                if (dnsStatusId != null && isDnsError(dnsStatusId)) {
+                if (dnsStatusId != null && isDnsError(dnsStatusId) && ps != UIUtils.ProxyStatus.TPU) {
                     // check for dns failure cases and update the UI
                     b.statusText.text = getString(R.string.status_failing)
                         .replaceFirstChar(Char::titlecase)
                     b.interfaceDetailCard.strokeWidth = 2
                     b.interfaceDetailCard.strokeColor = fetchColor(this, R.attr.chipTextNegative)
-                    return@uiCtx
                 } else if (statusPair.first != null) {
                     val handshakeTime = getHandshakeTime(stats).toString()
                     val statusText = getStatusText(ps, handshakeTime, stats, statusPair.second)
@@ -342,6 +373,151 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
                     getString(R.string.lbl_disabled).replaceFirstChar(Char::titlecase)
             }
         }
+    }
+
+    private fun cancelStatsJob() {
+        if (statsJob?.isActive == true) statsJob?.cancel()
+        statsJob = null
+    }
+
+    /**
+     * Launches a coroutine that fetches and applies live stats every
+     * [STATS_POLL_MS] ms. Client IPs are resolved separately by
+     * [resolveClientIps]: this method only handles VpnController stats.
+     */
+    private fun startStatsPolling(id: Int) {
+        cancelStatsJob()
+        val config = WireguardManager.getConfigFilesById(id)
+        if (config?.isActive != true) return
+
+        statsJob = io {
+            while (true) {
+                try {
+                    fetchAndApplyStats(id)
+                } catch (e: Exception) {
+                    Logger.w(LOG_TAG_UI, "stats poll error: ${e.message}")
+                }
+                delay(STATS_POLL_MS.milliseconds)
+            }
+        }
+    }
+
+    private suspend fun fetchAndApplyStats(id: Int) {
+        updateStatusUi(id)
+    }
+
+    /**
+     * Resolves client tunnel IPs (and all [IPMetadata]) on IO and applies them on the main thread.
+     * Runs independently of stats polling so the table renders fast.
+     */
+    private fun resolveClientIps(id: Int) {
+        showClientIpShimmer()
+        io {
+            var ip4Meta: IPMetadata? = null
+            var ip6Meta: IPMetadata? = null
+            try {
+                val cid = ID_WG_BASE + id
+                Logger.d(LOG_TAG_UI, "resolveClientIps[$id]: live fetch")
+                val client = VpnController.getWgClientInfoById(cid)
+                ip4Meta = client?.iP4()
+                ip6Meta = client?.iP6()
+                Logger.v(LOG_TAG_UI, "client ips resolved for $id: ip4: ${ip4Meta}, ip6: $ip6Meta")
+            } catch (e: Exception) {
+                Logger.w(LOG_TAG_UI, "failed to resolve client ips: ${e.message}")
+            }
+            uiCtx { applyClientIps(ip4Meta, ip6Meta) }
+        }
+    }
+
+    /** Show inline shimmer placeholders for client value cell. */
+    private fun showClientIpShimmer() {
+        b.shimmerClientInfo.visibility = View.VISIBLE
+        b.shimmerClientInfo.startShimmer()
+        b.valueIpv4.visibility = View.GONE
+    }
+
+    /**
+     * Replaces the inline shimmer with rich IP + metadata text.
+     * ASN / location / providerUrl are embedded inside
+     */
+    private fun applyClientIps(ip4: IPMetadata?, ip6: IPMetadata?) {
+        val na = getString(R.string.lbl_not_available_short)
+
+        // client info
+        b.shimmerClientInfo.stopShimmer()
+        b.shimmerClientInfo.visibility = View.GONE
+        b.valueIpv4.visibility = View.VISIBLE
+        b.valueIpv4.text = ip4?.takeIf { it.ip?.isNotBlank() == true }
+            ?.let { buildIpDetailSpan(it) }
+            ?: na
+        if (ip6 == null) {
+            b.valueIpv6.visibility = View.GONE
+        } else {
+            b.valueIpv6.text = ip6.takeIf { it.ip?.isNotBlank() == true }
+                ?.let { buildIpDetailSpan(it) }
+                ?: na
+        }
+    }
+
+    /**
+     * Builds a multi-line [SpannableStringBuilder] for a single [IPMetadata].
+     *
+     * ```
+     * 10.0.0.1
+     * ASN  AS13335 · Cloudflare Inc · net.cloudflare.com
+     * LOC  Frankfurt · 50.1109°, 8.6821°
+     * via  cloudflare.com
+     * ```
+     */
+    private fun buildIpDetailSpan(meta: IPMetadata): SpannableStringBuilder {
+        val sb = SpannableStringBuilder()
+        val labelColor = fetchColor(this, R.attr.primaryLightColorText)
+
+        fun styleLabel(start: Int, end: Int) {
+            sb.setSpan(ForegroundColorSpan(labelColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(RelativeSizeSpan(0.80f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        fun appendLine(label: String, value: String) {
+            if (value.isBlank()) return
+            sb.append("\n")
+            val ls = sb.length
+            sb.append(label)
+            styleLabel(ls, sb.length)
+            sb.append("  $value")
+        }
+
+        // ip
+        val ipStart = 0
+        sb.append(meta.ip ?: "")
+        val ipEnd = sb.length
+        sb.setSpan(TypefaceSpan("monospace"), ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        sb.setSpan(RelativeSizeSpan(1.07f),   ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+
+        // asn
+        val asnParts = buildList {
+            val asn = meta.asn ?: ""
+            val org = meta.asnOrg ?: ""
+            val dom = meta.asnDom ?: ""
+            if (asn.isNotBlank()) add(asn)
+            if (org.isNotBlank()) add(org)
+            if (dom.isNotBlank()) add(dom)
+        }
+        if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString("  ·  "))
+
+        val locParts = buildList {
+            val city = meta.city ?: ""
+            val cc = meta.cc ?: ""
+            val lat = meta.lat
+            val lon = meta.lon
+            if (city.isNotBlank()) add(city)
+            if (cc.isNotBlank()) add(cc)
+            if (lat != 0.0 || lon != 0.0) add(String.format(Locale.US, "%.4f°, %.4f°", lat, lon))
+        }
+        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))
+
+        return sb
     }
 
     private fun isDnsError(statusId: Long?): Boolean {
@@ -886,8 +1062,8 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
         withContext(Dispatchers.Main) { f() }
     }
 
-    private fun io(f: suspend () -> Unit) {
-        lifecycleScope.launch(Dispatchers.IO) { f() }
+    private fun io(f: suspend () -> Unit): Job {
+        return lifecycleScope.launch(Dispatchers.IO) { f() }
     }
 
     private fun ui(f: suspend () -> Unit) {

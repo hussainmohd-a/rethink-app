@@ -162,8 +162,8 @@ object Logger : KoinComponent {
             return this == STACKTRACE
         }
 
-        fun isLessThan(level: LoggerLevel): Boolean {
-            return this.id < level.id
+        fun isLessThanOrEqualTo(level: LoggerLevel): Boolean {
+            return this.id <= level.id
         }
 
         fun user(): Boolean {

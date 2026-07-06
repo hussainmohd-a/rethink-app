@@ -201,10 +201,6 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
                     }.getOrElse { emptyList() }
                 } else emptyList()
 
-                val rpnStats = if (includeStats) {
-                    runCatching { RpnProxyManager.stats() }.getOrElse { "unavailable" }
-                } else ""
-
                 val entitlementJson = if (includeStats) {
                     runCatching {
                         val details = RpnProxyManager.getEntitlementDetails()
@@ -230,7 +226,6 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
                     category     = category,
                     statuses     = allStatuses,
                     history      = recentHistory,
-                    rpnStats     = rpnStats,
                     entitlementJson = entitlementJson
                 )
 
@@ -265,7 +260,6 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
         category: String?,
         statuses: List<SubscriptionStatus>,
         history: List<com.celzero.bravedns.database.SubscriptionStateHistory>,
-        rpnStats: String,
         entitlementJson: String? = null
     ): String {
         // Use plain ASCII separators only: Unicode box-drawing characters (===, ---, arrows)
@@ -340,14 +334,6 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
             }
         }
         sb.append("\n")
-
-        if (rpnStats.isNotEmpty()) {
-            sb.append(light)
-            sb.append("  RPN PROXY STATS\n")
-            sb.append(light)
-            sb.append(rpnStats)
-            sb.append("\n")
-        }
 
         if (!entitlementJson.isNullOrBlank()) {
             sb.append(light)

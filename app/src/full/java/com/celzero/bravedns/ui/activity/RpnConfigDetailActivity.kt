@@ -45,6 +45,7 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.withRotation
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.transition.Visibility
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
 import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
@@ -59,7 +60,7 @@ import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.BaseActivity
 import com.celzero.bravedns.ui.activity.NetworkLogsActivity.Companion.RULES_SEARCH_ID_RPN
 import com.celzero.bravedns.ui.activity.RpnConfigDetailActivity.Companion.STATS_POLL_MS
-import com.celzero.bravedns.ui.dialog.CountrySsidDialog
+import com.celzero.bravedns.ui.dialog.RpnSsidDialog
 import com.celzero.bravedns.ui.dialog.WgIncludeAppsDialog
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.SnackbarHelper
@@ -86,6 +87,7 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Detail screen for a server-provided WireGuard / WIN proxy.
@@ -102,7 +104,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
 
     private var configKey: String = ""
     private var countryConfig: CountryConfig? = null
-    private var winIdentifier: String? = null
+    private var pubPub: String = ""
 
     /** Coroutine that polls VpnController every [STATS_POLL_MS] ms. */
     private var statsJob: Job? = null
@@ -244,13 +246,12 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         // Placeholder while we fetch from DB.
         b.configNameText.text = ""
         b.tvHeroCity.text = ""
-        b.tvHeroFlag.text = "\uD83C\uDF10" // globe
-        b.tvHeroWho.text = ""
-        winIdentifier = null
+        b.tvHeroFlag.visibility = View.GONE
         b.chipHeroStats.visibility = View.GONE
 
         // Show inline shimmer for client IPs (stats table is already visible).
         showClientIpShimmer()
+        showServerInfoShimmer()
 
         io {
             val config = RpnProxyManager.getCountryConfigByKey(configKey)
@@ -263,14 +264,21 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
                 setupSsidSection(configKey)
                 // Banner.
                 if (config != null) {
-                    b.tvHeroFlag.text = config.flagEmoji
+                    if (configKey.equals(AUTO_SERVER_ID, true)) {
+                        b.tvHeroFlag.visibility = View.GONE
+                        b.ivHeroFlag.visibility = View.VISIBLE
+                    } else {
+                        b.ivHeroFlag.visibility = View.GONE
+                        b.tvHeroFlag.visibility = View.VISIBLE
+                        b.tvHeroFlag.text = config.flagEmoji
+                    }
                     b.configNameText.text = config.countryName
                     val city = config.city.ifBlank { config.serverLocation }
                     b.tvHeroCity.text = city.ifBlank { config.cc }
                 } else {
-                    b.tvHeroFlag.text = "\uD83C\uDF10"
+                    b.tvHeroFlag.visibility = View.GONE
                     b.configNameText.text = configKey.ifBlank { getString(R.string.lbl_server_config) }
-                    b.tvHeroCity.text     = ""
+                    b.tvHeroCity.text = ""
                 }
                 // Update the collapsing toolbar title now that we have the real config name.
                 b.collapsingToolbar.title = b.configNameText.text
@@ -278,6 +286,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
                 startStatsPolling(configKey)
             }
 
+            showServerInfo(configKey)
             resolveClientIps(configKey)
         }
     }
@@ -288,7 +297,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
      */
     private suspend fun resolveClientIps(id: String) {
         var ip4Meta: IPMetadata? = null
-        var ip6Meta: IPMetadata? = null
         var sinceTs: Long
         try {
             val pid = if (id.contains(AUTO_SERVER_ID, ignoreCase = true)) {
@@ -305,12 +313,96 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             // GoVpnAdapter handles AUTO and empty-string ids centrally; pass id as-is.
             val client = VpnController.getRpnClientInfoById(id)
             ip4Meta = client?.iP4()
-            ip6Meta = client?.iP6()
-            Logger.v(LOG_TAG_UI, "client ips resolved for $id: ip4=${ip4Meta?.ip} ip6=${ip6Meta?.ip}, sinceTs=$sinceTs")
+            Logger.v(LOG_TAG_UI, "client ips resolved for $id: ip4=${ip4Meta?.ip}, sinceTs=$sinceTs")
         } catch (e: Exception) {
             Logger.w(LOG_TAG_UI, "failed to resolve client ips: ${e.message}")
         }
-        uiCtx { applyClientIps(ip4Meta, ip6Meta) }
+        uiCtx { applyClientIps(ip4Meta) }
+    }
+
+    private fun showServerInfo(key: String) {
+        io {
+            val addlInfo = VpnController.getRpnAddlInfo(key)
+            uiCtx {
+                b.shimmerAddlInfo.stopShimmer()
+                b.shimmerAddlInfo.visibility = View.GONE
+                if (addlInfo == null) {
+                    b.rowAddlInfo.visibility = View.GONE
+                    b.tvHeroPub.visibility = View.GONE
+                    pubPub = ""
+                    b.valueAddlInfo.visibility = View.VISIBLE
+                    b.valueAddlInfo.text = getString(R.string.lbl_not_available_short)
+                } else {
+                    b.valueAddlInfo.visibility = View.VISIBLE
+                    pubPub = addlInfo.pubPub
+                    b.tvHeroPub.visibility = View.VISIBLE
+                    b.tvHeroPub.text = pubPub
+                    b.valueAddlInfo.text = buildAddlInfoSpan(addlInfo)
+                    // update load if available
+                    buildLoadSpeedText(addlInfo.load, addlInfo.link)
+                    if (key.isEmpty() || key.equals(AUTO_SERVER_ID, true)) {
+                        b.tvHeroCity.text = addlInfo.city + ", " + addlInfo.cc
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Builds a multi-line [SpannableStringBuilder] for an [ActiveRpnAddlInfo].
+     *
+     * ```
+     * <addr>
+     * LOC  <city> (<cc>)
+     * PUB  <pubPub>      (hidden, kept on field for external use)
+     * NAME <name>
+     * LOAD <load>% · <link> Mbps
+     * APPS <count> (<allowed>)
+     * ```
+     */
+    private fun buildAddlInfoSpan(info: RpnProxyManager.ActiveRpnAddlInfo): SpannableStringBuilder {
+        val sb = SpannableStringBuilder()
+        val labelColor = fetchColor(this, R.attr.primaryLightColorText)
+
+        fun styleLabel(start: Int, end: Int) {
+            sb.setSpan(ForegroundColorSpan(labelColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(RelativeSizeSpan(0.80f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+
+        fun appendLine(label: String, value: String) {
+            if (value.isBlank()) return
+            sb.append("\n")
+            val ls = sb.length
+            sb.append(label)
+            sb.append(" · $value")
+            styleLabel(ls, sb.length)
+        }
+
+        // addr
+        val addrs = info.addr.split(",")
+
+        addrs.forEachIndexed { index, addr ->
+            if (index == 1) { sb.append("\n") } else if (index > 1) { sb.append(" · ") }
+
+            val start = sb.length
+            sb.append(addr.trim())
+            val end = sb.length
+
+            sb.setSpan(
+                TypefaceSpan("monospace"),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            sb.setSpan(
+                RelativeSizeSpan(1.07f),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+
+        return sb
     }
 
     /** Show inline shimmer placeholders for client IPv4/IPv6 value cells. */
@@ -318,17 +410,19 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         b.shimmerIpv4.visibility = View.VISIBLE
         b.shimmerIpv4.startShimmer()
         b.valueIpv4.visibility = View.GONE
+    }
 
-        b.shimmerIpv6.visibility = View.VISIBLE
-        b.shimmerIpv6.startShimmer()
-        b.valueIpv6.visibility = View.GONE
+    private fun showServerInfoShimmer() {
+        b.shimmerAddlInfo.visibility = View.VISIBLE
+        b.shimmerAddlInfo.startShimmer()
+        b.valueAddlInfo.visibility = View.GONE
     }
 
     /**
      * Replaces the inline shimmer with rich IP + metadata text.
      * ASN / location / providerUrl are embedded inside
      */
-    private fun applyClientIps(ip4: IPMetadata?, ip6: IPMetadata?) {
+    private fun applyClientIps(ip4: IPMetadata?) {
         val na = getString(R.string.lbl_not_available_short)
 
         // IPv4
@@ -339,18 +433,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             ?.takeIf { it.ip?.isNotBlank() == true }
             ?.let { buildIpDetailSpan(it) }
             ?: na
-
-        // ipv6, hide the entire row if unavailable
-        b.shimmerIpv6.stopShimmer()
-        b.shimmerIpv6.visibility = View.GONE
-        val ip6Addr = ip6?.ip?.takeIf { it.isNotBlank() }
-        if (ip6 != null && ip6Addr != null) {
-            b.rowIpv6.visibility = View.VISIBLE
-            b.valueIpv6.visibility = View.VISIBLE
-            b.valueIpv6.text = buildIpDetailSpan(ip6)
-        } else {
-            b.rowIpv6.visibility = View.GONE
-        }
     }
 
     /**
@@ -395,31 +477,21 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             val asn = meta.asn ?: ""
             val org = meta.asnOrg ?: ""
             val dom = meta.asnDom ?: ""
-            if (asn.isNotBlank()) add("AS$asn")
+            if (asn.isNotBlank()) add(asn)
             if (org.isNotBlank()) add(org)
             if (dom.isNotBlank()) add(dom)
         }
         if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString("  ·  "))
 
-        // loc
-        val locParts = buildList {
+        // loc, do not show client location for now as it is confusing
+        /*val locParts = buildList {
             val city = meta.city ?: ""
             val lat = meta.lat
             val lon = meta.lon
             if (city.isNotBlank()) add(city)
             if (lat != 0.0 || lon != 0.0) add(String.format(Locale.US, "%.4f°, %.4f°", lat, lon))
         }
-        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))
-
-        // provider url
-        val providerUrl = meta.providerURL ?: ""
-        if (providerUrl.isNotBlank()) {
-            val display = providerUrl
-                .removePrefix("https://")
-                .removePrefix("http://")
-                .trimEnd('/')
-            appendLine("VIA", display)
-        }
+        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))*/
 
         return sb
     }
@@ -444,7 +516,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
                 } catch (e: Exception) {
                     Logger.w(LOG_TAG_UI, "stats poll error: ${e.message}")
                 }
-                delay(STATS_POLL_MS)
+                delay(STATS_POLL_MS.milliseconds)
             }
         }
     }
@@ -459,16 +531,12 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         }
         val statusPair = VpnController.getProxyStatusById(pid)
         val stats = VpnController.getProxyStats(pid)
-        if (winIdentifier.isNullOrEmpty()) {
-            winIdentifier = VpnController.getWinIdentifier()
-        }
-        val who = winIdentifier
         val config = countryConfig
         // Use the time when this server key was selected by the user, not the VPN uptime.
         val selectedSinceTs = RpnProxyManager.getSelectedSinceTs(id)
 
         uiCtx {
-            applyStats(statusPair, stats, config, who, selectedSinceTs)
+            applyStats(statusPair, stats, config, selectedSinceTs)
         }
     }
 
@@ -483,7 +551,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         statusPair: Pair<Long?, String>,
         stats: RouterStats?,
         config: CountryConfig?,
-        who: String?,
         selectedSinceTs: Long
     ) {
         val ps = UIUtils.ProxyStatus.entries.find { it.id == statusPair.first }
@@ -491,13 +558,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         val statusColor = buildStatusColor(ps)
         b.valueStatus.text = statusText
         b.valueStatus.setTextColor(fetchColor(this, statusColor))
-
-        if (who.isNullOrEmpty()) {
-            b.tvHeroWho.visibility = View.GONE
-        } else {
-            b.tvHeroWho.visibility = View.VISIBLE
-            b.tvHeroWho.text = who
-        }
 
         val rx = stats?.rx ?: 0L
         val tx = stats?.tx ?: 0L
@@ -515,6 +575,14 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             )
         else getString(R.string.lbl_never)
 
+        val lastOpen = stats?.lastOpen ?: 0L
+        b.valueLastOpen.text = if (lastOK > 0L)
+            DateUtils.getRelativeTimeSpanString(
+                lastOpen, System.currentTimeMillis(),
+                DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
+            )
+        else getString(R.string.lbl_never)
+
         // Show when the user selected this server, not the VPN tunnel's uptime.
         b.valueSince.text = if (selectedSinceTs > 0L)
             DateUtils.getRelativeTimeSpanString(
@@ -523,9 +591,11 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             )
         else getString(R.string.lbl_never)
 
-        val loadPct = config?.load ?: 0
-        val linkMbps = config?.link ?: 0
-        buildLoadSpeedText(loadPct, linkMbps)
+        if (!config?.id.equals(AUTO_SERVER_ID, true)) {
+            val loadPct = config?.load ?: 0
+            val linkMbps = config?.link ?: 0
+            buildLoadSpeedText(loadPct, linkMbps)
+        }
 
         // only shown when proxy is in a failing state.
         val isFailing = isFailing(ps)
@@ -691,20 +761,8 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         b.hopBtn.setOnClickListener { openHopDialog() }
         b.logsBtn.setOnClickListener { openLogsDialog(key) }
 
-        b.configIdText.setOnClickListener {
-            initiateReconnect(key)
-        }
-        b.valueWho.setOnClickListener(null)
-        b.tvHeroWho.setOnClickListener {
-            val text = b.tvHeroWho.text?.toString().orEmpty()
-            if (text.isBlank()) return@setOnClickListener
-            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-            clipboard.setPrimaryClip(ClipData.newPlainText("who", text))
-            Utilities.showToastUiCentered(
-                this,
-                getString(R.string.copied_clipboard),
-                Toast.LENGTH_SHORT
-            )
+        b.refreshChip.setOnClickListener {
+            initiateRefresh(key)
         }
 
         if (configKey.isBlank()) {
@@ -776,20 +834,31 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
 
         b.catchAllRl.setOnClickListener { b.catchAllCheck.performClick() }
         b.useMobileRl.setOnClickListener { b.useMobileCheck.performClick() }
+        b.tvHeroPub.setOnClickListener {
+            val text = b.tvHeroPub.text?.toString().orEmpty()
+            if (text.isBlank()) return@setOnClickListener
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("pubPub", text))
+            Utilities.showToastUiCentered(
+                this,
+                getString(R.string.copied_clipboard),
+                Toast.LENGTH_SHORT
+            )
+        }
         // ssidFilterRl click listener and ssidCheck listener are managed by setupSsidSectionUI
     }
 
-    private fun initiateReconnect(key: String) {
-        setRefreshReconnectEnabled(false)
+    private fun initiateRefresh(key: String) {
+        setRefreshUiEnabled(false)
         io {
             // GoVpnAdapter handles AUTO and empty-string ids centrally
             val reconnect = if (key.contains(AUTO_SERVER_ID, ignoreCase = true)) {
-                VpnController.reconnectRpnProxy("")
+                VpnController.refreshRpnProxy("")
             } else {
-                VpnController.reconnectRpnProxy(key)
+                VpnController.refreshRpnProxy(key)
             }
             uiCtx {
-                setRefreshReconnectEnabled(true)
+                setRefreshUiEnabled(true)
                 if (reconnect) {
                     Utilities.showToastUiCentered(this, getString(R.string.dc_refresh_toast), Toast.LENGTH_SHORT)
                 } else {
@@ -799,19 +868,19 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         }
     }
 
-    private fun setRefreshReconnectEnabled(enabled: Boolean) {
+    private fun setRefreshUiEnabled(enabled: Boolean) {
         val targetAlpha = if (enabled) 1f else 0.40f
-        b.configIdText.isEnabled = enabled
-        b.configIdText.isClickable = enabled
-        b.configIdText.animate().alpha(targetAlpha).setDuration(160).start()
+        b.refreshChip.isEnabled = enabled
+        b.refreshChip.isClickable = enabled
+        b.refreshChip.animate().alpha(targetAlpha).setDuration(160).start()
         if (enabled) stopChipIconAnimation() else startChipIconAnimation()
     }
 
     /** Starts a continuous clockwise spin on the chip's icon only. */
     private fun startChipIconAnimation() {
         chipAnimator?.cancel()
-        val raw = b.configIdText.chipIcon
-        val spinning: RotatingDrawable = raw as? RotatingDrawable ?: RotatingDrawable(raw ?: return).also { b.configIdText.chipIcon = it }
+        val raw = b.refreshChip.chipIcon
+        val spinning: RotatingDrawable = raw as? RotatingDrawable ?: RotatingDrawable(raw ?: return).also { b.refreshChip.chipIcon = it }
         spinning.rotation = 0f
         chipAnimator = ValueAnimator.ofFloat(0f, 360f).apply {
             duration = 700L
@@ -830,7 +899,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
     private fun stopChipIconAnimation() {
         chipAnimator?.cancel()
         chipAnimator = null
-        val icon = b.configIdText.chipIcon as? RotatingDrawable ?: return
+        val icon = b.refreshChip.chipIcon as? RotatingDrawable ?: return
         ValueAnimator.ofFloat(icon.rotation, 0f).apply {
             duration = 200L
             interpolator = AccelerateDecelerateInterpolator()
@@ -1136,7 +1205,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         if (configKey.isBlank() || countryConfig == null) return
         var themeId = Themes.getCurrentTheme(isDarkThemeOn(), persistentState.theme)
         if (Themes.isFrostTheme(themeId)) themeId = R.style.App_Dialog_NoDim
-        val dlg = CountrySsidDialog(
+        val dlg = RpnSsidDialog(
             this, themeId, configKey,
             countryConfig?.countryName ?: configKey,
             countryConfig?.ssids.orEmpty()

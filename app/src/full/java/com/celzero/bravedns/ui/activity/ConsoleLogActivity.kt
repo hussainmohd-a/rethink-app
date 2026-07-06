@@ -29,16 +29,21 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.SearchView
 import androidx.core.content.FileProvider
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.paging.PagingData
+import androidx.paging.filter
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
+import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
 import com.celzero.bravedns.adapter.ConsoleLogAdapter
+import com.celzero.bravedns.database.ConsoleLog
 import com.celzero.bravedns.database.ConsoleLogRepository
 import com.celzero.bravedns.databinding.ActivityConsoleLogBinding
 import com.celzero.bravedns.net.go.GoVpnAdapter
@@ -70,7 +75,7 @@ import org.koin.android.ext.android.inject
 import java.io.File
 import kotlin.time.Duration.Companion.milliseconds
 
-class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx.appcompat.widget.SearchView.OnQueryTextListener {
+class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), SearchView.OnQueryTextListener {
 
     private val b by viewBinding(ActivityConsoleLogBinding::bind)
     private var layoutManager: RecyclerView.LayoutManager? = null
@@ -86,10 +91,18 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
         private const val QUERY_TEXT_DELAY: Long = 1000
         private const val CRASH_CODE = "**CRASH0**"
         private const val DONT_PANIC_CODE = "**CRASH1**"
+        private const val PANIC_CRASH_CODE = "**CRASH2**"
     }
 
     // Guard against rapid double-taps on share buttons while a job is in-progress
     private var isShareInProgress = false
+
+    // When true, ignore updates from the database so the ui
+    private var isPaused: Boolean = false
+
+    private var currentFilter: String = ""
+
+    private var currentMinLevel: Int = 0
 
     private fun Context.isDarkThemeOn(): Boolean {
         return resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
@@ -119,7 +132,13 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
                 .debounce(QUERY_TEXT_DELAY.milliseconds)
                 .distinctUntilChanged()
                 .collect { query ->
-                    viewModel.setFilter(query)
+                    currentFilter = query
+                    if (isPaused) {
+                        // apply filters in local paging data instead of database
+                        reapplyLocalFilter()
+                    } else {
+                        viewModel.setFilter(query)
+                    }
                 }
         }
     }
@@ -140,6 +159,11 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
     }
 
     private fun initView() {
+        if (DEBUG) {
+            b.pauseIcon.visibility = View.VISIBLE
+        } else {
+            b.pauseIcon.visibility = View.GONE
+        }
         setAdapter()
         // update the text view with the time since logs are available
         io {
@@ -199,6 +223,7 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
             b.consoleLogList.layoutManager = layoutManager
             recyclerAdapter = ConsoleLogAdapter(this)
             b.consoleLogList.adapter = recyclerAdapter
+            currentMinLevel = Logger.uiLogLevel.toInt()
             viewModel.setLogLevel(Logger.uiLogLevel)
             observeLog()
         } catch (e: Exception) {
@@ -206,10 +231,30 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
         }
     }
 
+    private var lastPagingData: PagingData<ConsoleLog>? = null
+
     private fun observeLog() {
         viewModel.logs.observe(this) { pagingData ->
-            recyclerAdapter?.submitData(lifecycle, pagingData)
+            lastPagingData = pagingData
+            val toSubmit = applyLocalFilter(pagingData)
+            recyclerAdapter?.submitData(lifecycle, toSubmit)
         }
+    }
+
+    private fun applyLocalFilter(pagingData: PagingData<ConsoleLog>): PagingData<ConsoleLog> {
+        val q = currentFilter
+        val lvl = currentMinLevel
+        if (q.isEmpty() && lvl <= 0) return pagingData
+        return pagingData.filter { log ->
+            val matchesText = q.isEmpty() || log.message.contains(q, ignoreCase = true)
+            val matchesLevel = lvl <= 0 || log.level >= lvl
+            matchesText && matchesLevel
+        }
+    }
+
+    private fun reapplyLocalFilter() {
+        val pd = lastPagingData ?: return
+        recyclerAdapter?.submitData(lifecycle, applyLocalFilter(pd))
     }
     private fun setupClickListener() {
 
@@ -251,6 +296,23 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
         b.searchFilterIcon.setOnClickListener {
             showFilterDialog()
         }
+
+        b.pauseIcon.setOnClickListener {
+            togglePause()
+        }
+    }
+
+    private fun togglePause() {
+        isPaused = !isPaused
+        if (isPaused) {
+            b.pauseIcon.setImageResource(R.drawable.ic_prevent_dns_proxy)
+            Logger.i(LOG_TAG_BUG_REPORT, "console log stream paused")
+        } else {
+            b.pauseIcon.setImageResource(R.drawable.ic_pause)
+            // fresh stream of data is emitted, which the observer will forward to the adapter.
+            viewModel.restartLogStream()
+            Logger.i(LOG_TAG_BUG_REPORT, "console log stream resumed")
+        }
     }
 
     private fun showFilterDialog() {
@@ -278,7 +340,14 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
                 Logger.uiLogLevel.toInt(),
                 persistentState.includeFileTrace
             )
-            viewModel.setLogLevel(which.toLong())
+            currentMinLevel = which
+            if (isPaused) {
+                // apply the level filter on the local paging data only; do not
+                // refetch from the DB while paused.
+                reapplyLocalFilter()
+            } else {
+                viewModel.setLogLevel(which.toLong())
+            }
             if (which < Logger.LoggerLevel.ERROR.id) {
                 consoleLogRepository.setStartTimestamp(System.currentTimeMillis())
             }
@@ -295,7 +364,12 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
                 Logger.uiLogLevel.toInt(),
                 persistentState.includeFileTrace
             )
-            viewModel.setLogLevel(Logger.uiLogLevel)
+            currentMinLevel = Logger.uiLogLevel.toInt()
+            if (isPaused) {
+                reapplyLocalFilter()
+            } else {
+                viewModel.setLogLevel(Logger.uiLogLevel)
+            }
             Logger.i(LOG_TAG_BUG_REPORT, "File trace set to $isChecked")
         }
         val density = resources.displayMetrics.density
@@ -507,6 +581,9 @@ class ConsoleLogActivity : BaseActivity(R.layout.activity_console_log), androidx
             return true
         } else if (query == DONT_PANIC_CODE) {
             crashTun(1L)
+            return true
+        } else if (query == PANIC_CRASH_CODE) {
+            crashTun(2L)
             return true
         }
         searchQuery.value = query

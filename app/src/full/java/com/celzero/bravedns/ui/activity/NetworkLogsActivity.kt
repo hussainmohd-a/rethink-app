@@ -33,6 +33,7 @@ import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.BaseActivity
 import com.celzero.bravedns.ui.activity.UniversalFirewallSettingsActivity.Companion.RULES_SEARCH_ID
 import com.celzero.bravedns.ui.fragment.ConnectionTrackerFragment
+import com.celzero.bravedns.ui.fragment.ConnectionTrackerFragment.Companion.MERGE_RETHINK_LOGS
 import com.celzero.bravedns.ui.fragment.DnsLogFragment
 import com.celzero.bravedns.ui.fragment.RethinkLogFragment
 import com.celzero.bravedns.ui.fragment.WgNwStatsFragment
@@ -141,7 +142,7 @@ class NetworkLogsActivity : BaseActivity(R.layout.activity_network_logs) {
         }
 
         var count = 0
-        if (persistentState.routeRethinkInRethink) {
+        if (persistentState.routeRethinkInRethink && !MERGE_RETHINK_LOGS) {
             count = 1
         }
         return when (appConfig.getBraveMode()) {

@@ -30,7 +30,6 @@ import androidx.core.content.ContextCompat
 import com.celzero.bravedns.R
 import com.celzero.bravedns.scheduler.EnhancedBugReport
 import com.celzero.bravedns.service.BraveVPNService.Companion.NW_ENGINE_NOTIFICATION_ID
-import com.celzero.bravedns.service.GoMemLogConsumer.Companion.SLOT_SIZE
 import com.celzero.bravedns.ui.activity.AppLockActivity
 import com.celzero.bravedns.util.Daemons
 import com.celzero.bravedns.util.Themes
@@ -51,8 +50,8 @@ import java.io.FileOutputStream
  *
  * ## Buffer layout (Go contract)
  *
- * The buffer is divided into fixed **800-byte slots**. `start` and `end` are always multiples
- * of [SLOT_SIZE]. Within each slot:
+ * The buffer is divided into slotSize. `start` and `end` are always multiples
+ * of [slotSize]. Within each slot:
  *
  * ```
  *   slot[0]          → Go log-level character ('Y'/'V'/'D'/'I'/'W'/'E'/'F'/'U')
@@ -61,13 +60,10 @@ import java.io.FileOutputStream
  * ```
  *
  */
-class GoMemLogConsumer(
-    private val appContext: Context,
-    private val scope: CoroutineScope,
-) : LogConsumer {
+class GoMemLogConsumer(private val appContext: Context, private val scope: CoroutineScope, private val slotSize: Int) : LogConsumer {
 
-    // Single-thread background dispatcher; all buffer processing is serialised here so
-    // prevLogLevel and tombstoneStream need no additional synchronisation.
+    // Single-thread background dispatcher; all buffer processing is serialized here so
+    // prevLogLevel and tombstoneStream need no additional synchronization.
     private val processor = Daemons.make("goMemLog")
 
     // Inherited log level for continuation lines that carry no level prefix.
@@ -85,16 +81,53 @@ class GoMemLogConsumer(
         private const val TAG = "GoMemLog"
         private const val WARNING_CHANNEL_ID = "warning"
 
-        /**
-         * Fixed slot size guaranteed by the Go side.
-         * [drain] start/end offsets are always multiples of this value.
-         */
-        private const val SLOT_SIZE = 800
-
         /** Safety cap: never read more than this per [drain] call. */
         private const val MAX_DRAIN_BYTES = 512 * 1024
 
         private val NEWLINE_BYTE: Byte = '\n'.code.toByte()
+
+        fun getInstance(appContext: Context?, scope: CoroutineScope?, fda: Long, fdb: Long, slotSize: Int): LogConsumer? {
+            if (appContext == null) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: appContext null")
+                return null
+            }
+            if (scope == null) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: scope null")
+                return null
+            }
+
+            // see if the fda can supports buffer IO, if not return null so that we can fallback
+            // to logFD
+            /*if (!supportsBufferedIO(fda.toInt())) {
+                Logger.w(LOG_TAG_BUG_REPORT, "$TAG getInstance: fd=$fda does not support buffered IO")
+                return null
+            }*/
+
+            val goMem = GoMemLogConsumer(appContext, scope, slotSize)
+
+            scope.launch {
+                goMem.ensureTombstoneStreamReady()
+            }
+
+            return goMem
+        }
+
+        private fun getOrCreateFdWrapper(fd: Int): FileDescriptor? {
+            val fdWrapper = FileDescriptor()
+            if (!FdHelper.setFdInt(fdWrapper, fd, TAG)) return null
+            return fdWrapper
+        }
+
+        private fun supportsBufferedIO(fd: Int): Boolean {
+            return try {
+                val fdWrapper = getOrCreateFdWrapper(fd) ?: return false
+                val o = BufferedOutputStream(FileOutputStream(fdWrapper))
+                o.close()
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 
     /**
@@ -114,9 +147,9 @@ class GoMemLogConsumer(
 
         val rawLength = (end - start).coerceAtMost(MAX_DRAIN_BYTES.toLong()).toInt()
         // Round down to the nearest complete slot, a partial slot must never be processed.
-        val length = (rawLength / SLOT_SIZE) * SLOT_SIZE
+        val length = (rawLength / slotSize) * slotSize
         if (length == 0) {
-            Logger.vv(LOG_TAG_BUG_REPORT, "$TAG drain: no complete slots fd=$fd [$start,$end) rawLen=$rawLength")
+            Logger.vv(LOG_TAG_BUG_REPORT, "$TAG drain: no complete slots fd=$fd [$start,$end) rawLen=$rawLength, slotSize=$slotSize")
             return 0L
         }
 
@@ -161,9 +194,9 @@ class GoMemLogConsumer(
      */
     private fun processBuffer(buffer: ByteArray, bytesRead: Int) {
         var slotOffset = 0
-        while (slotOffset + SLOT_SIZE <= bytesRead) {
+        while (slotOffset + slotSize <= bytesRead) {
             processSlot(buffer, slotOffset)
-            slotOffset += SLOT_SIZE
+            slotOffset += slotSize
         }
     }
 
@@ -191,7 +224,7 @@ class GoMemLogConsumer(
         }
 
         // Scan for '\n' to find where real content ends; everything after it is padding.
-        val slotEnd = offset + SLOT_SIZE
+        val slotEnd = offset + slotSize
         var newlinePos = slotEnd // default: no '\n' found → treat full slot as content
         for (i in (offset + 1) until slotEnd) {
             if (buffer[i] == NEWLINE_BYTE) {

@@ -172,7 +172,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:visibility="visible"
+                            android:visibility="gone"
                             android:layout_marginStart="4dp"
                             android:layout_marginEnd="4dp"
                             app:shimmer_auto_start="true"
@@ -226,8 +226,8 @@
                         <View
                             android:layout_width="match_parent"
                             android:layout_height="1dp"
-                            android:layout_marginTop="16dp"
-                            android:layout_marginBottom="12dp"
+                            android:layout_marginTop="8dp"
+                            android:layout_marginBottom="8dp"
                             android:alpha="0.3"
                             android:background="?attr/primaryTextColor" />
 
@@ -235,7 +235,6 @@
                             android:id="@+id/subscription_banner"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginBottom="12dp"
                             android:layout_marginStart="4dp"
                             android:layout_marginEnd="4dp"
                             android:orientation="horizontal"
@@ -288,7 +287,7 @@
                                 android:layout_height="56dp"
                                 android:gravity="center_vertical"
                                 android:orientation="horizontal"
-                                android:padding="14dp">
+                                android:padding="12dp">
 
                                 <View
                                     android:layout_width="20dp"
@@ -341,6 +340,23 @@
                                 android:textSize="@dimen/small_font_text_view" />
 
                         </LinearLayout>
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/tv_hero_who"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:fontFamily="monospace"
+                            android:alpha="0.75"
+                            android:layout_marginStart="10dp"
+                            android:layout_marginEnd="10dp"
+                            android:ellipsize="end"
+                            android:maxLines="1"
+                            android:textColor="?attr/homeScreenHeaderTextColor"
+                            android:textSize="@dimen/small_font_text_view"
+                            android:visibility="gone"
+                            tools:text="user@example.com"
+                            tools:visibility="visible" />
 
                     </LinearLayout>
 

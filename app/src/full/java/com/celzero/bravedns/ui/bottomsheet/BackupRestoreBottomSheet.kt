@@ -137,6 +137,8 @@ class BackupRestoreBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun getDownloadSource(): String {
+        if (Utilities.isWebsiteDegoogledFlavour()) return getString(R.string.build_flavor_website_degoogled)
+
         if (Utilities.isFdroidFlavour()) return getString(R.string.build__flavor_fdroid)
 
         if (Utilities.isPlayStoreFlavour()) return getString(R.string.build__flavor_play_store)
@@ -280,6 +282,7 @@ class BackupRestoreBottomSheet : BottomSheetDialogFragment() {
                             LOG_TAG_BACKUP_RESTORE,
                             "activity result for restore process with uri: $fileUri"
                         )
+                        persistUriPermission(fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         startRestoreProcess(fileUri)
                     }
                     Activity.RESULT_CANCELED -> {
@@ -303,6 +306,7 @@ class BackupRestoreBottomSheet : BottomSheetDialogFragment() {
                             LOG_TAG_BACKUP_RESTORE,
                             "activity result for backup process with uri: $backupFileUri"
                         )
+                        persistUriPermission(backupFileUri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                         startBackupProcess(backupFileUri)
                     }
                     Activity.RESULT_CANCELED -> {
@@ -313,6 +317,15 @@ class BackupRestoreBottomSheet : BottomSheetDialogFragment() {
                     }
                 }
             }
+    }
+
+    private fun persistUriPermission(uri: Uri?, modeFlags: Int) {
+        if (uri == null) return
+        try {
+            requireContext().contentResolver.takePersistableUriPermission(uri, modeFlags)
+        } catch (e: SecurityException) {
+            Logger.w(LOG_TAG_BACKUP_RESTORE, "Could not persist URI permission for $uri", e)
+        }
     }
 
     private fun getFileNameFromUri(uri: Uri): String {

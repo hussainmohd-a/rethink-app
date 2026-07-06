@@ -54,7 +54,6 @@ import com.celzero.bravedns.net.doh.CountryMap
 import com.celzero.bravedns.service.BraveVPNService
 import com.celzero.bravedns.service.DnsLogTracker
 import com.celzero.bravedns.util.Constants.Companion.BUILD_TYPE_ALPHA
-import com.celzero.bravedns.util.Constants.Companion.EMPTY_PACKAGE_NAME
 import com.celzero.bravedns.util.Constants.Companion.FLAVOR_FDROID
 import com.celzero.bravedns.util.Constants.Companion.FLAVOR_PLAY
 import com.celzero.bravedns.util.Constants.Companion.FLAVOR_WEBSITE
@@ -124,7 +123,7 @@ object Utilities {
                     fqdn
                 }
             }
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             // If fqdn is not a valid domain name, InternetDomainName.from() will throw an
             // exception.  Since this function is only for aesthetic purposes, we can
             // return the input unmodified in this case.
@@ -458,16 +457,20 @@ object Utilities {
         // For versions prior to 29 the check is made with Settings.Secure.
         // In our case, the always-on check is for all the vpn profiles. So using
         // vpnService?.isAlwaysOn will not be much helpful
-        if (isAtleastQ()) {
-            return vpnService?.isAlwaysOn == true
-        }
 
+        // Try Settings.Secure first so the check works even when the VPN service is not
+        // bound (e.g. immediately after reboot). On some Android versions this key is
+        // hidden/restricted, so fall back to the service property when available.
         return try {
             val alwaysOn = Settings.Secure.getString(context.contentResolver, "always_on_vpn_app")
             context.packageName == alwaysOn
         } catch (e: Exception) { // Catches SecurityException and other Settings-related exceptions
-            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}", e)
-            false
+            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}")
+            if (isAtleastQ()) {
+                vpnService?.isAlwaysOn == true
+            } else {
+                false
+            }
         }
     }
 
@@ -478,7 +481,7 @@ object Utilities {
             val alwaysOn = Settings.Secure.getString(context.contentResolver, "always_on_vpn_app")
             !TextUtils.isEmpty(alwaysOn) && context.packageName != alwaysOn
         } catch (e: Exception) { // Catches SecurityException and other Settings-related exceptions
-            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}", e)
+            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}")
             false
         }
     }
@@ -620,6 +623,10 @@ object Utilities {
 
     fun isPlayStoreFlavour(): Boolean {
         return BuildConfig.FLAVOR_releaseChannel == FLAVOR_PLAY
+    }
+
+    fun isWebsiteDegoogledFlavour(): Boolean {
+        return isFdroidFlavour() && BuildConfig.IS_WEBSITE_DEGOOGLD_BUILD
     }
 
 

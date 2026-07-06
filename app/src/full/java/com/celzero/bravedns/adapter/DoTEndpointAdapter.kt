@@ -202,7 +202,7 @@ class DoTEndpointAdapter(private val context: Context, private val appConfig: Ap
         }
 
         private fun showDoTMetadataDialog(title: String, url: String, message: String?) {
-            val builder = MaterialAlertDialogBuilder(context)
+            val builder = MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
             builder.setTitle(title)
             builder.setMessage(url + "\n\n" + getDnsDesc(message))
             builder.setCancelable(true)

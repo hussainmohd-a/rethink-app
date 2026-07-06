@@ -448,6 +448,9 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     // smart persistent keep alive for wireguard proxy
     var smartPersistentKeepalive by booleanPref("smart_persistent_keepalive").withDefault<Boolean>(false)
 
+    // true once the encrypted wireguard config files have been migrated to plain files
+    var wireguardPlainFileMigrationDone by booleanPref("wg_plain_file_migration_done").withDefault<Boolean>(false)
+
     var appTestMode by booleanPref("app_test_mode").withDefault<Boolean>(false)
 
     var advSettingForcePTMode by booleanPref("adv_setting_force_pt_mode").withDefault<Boolean>(false)
@@ -759,8 +762,10 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     // the version of the guided tour that was last shown; used to re-trigger on UI changes
     var guidedTourVersion by intPref("guided_tour_version").withDefault<Int>(0)
 
-    // maximum memory the go engine can consume in bytes
-    var goMaxMemory by longPref(GO_MAX_MEMORY).withDefault<Long>(1024 * 1024 * 1024L)
+    // maximum memory the go engine can consume in bytes (ideally value*1024*1024)
+    var goMaxMemory by longPref(GO_MAX_MEMORY).withDefault<Long>(-1L)
 
     var blockDnsForUnknownApp by booleanPref("block_dns_for_unknown_app").withDefault<Boolean>(false)
+
+    var showRethinkBlockNotification by booleanPref("show_rethink_block_notification").withDefault<Boolean>(true)
 }

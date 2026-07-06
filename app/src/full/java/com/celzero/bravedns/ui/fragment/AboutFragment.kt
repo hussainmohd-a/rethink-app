@@ -90,14 +90,18 @@ import com.celzero.bravedns.util.Utilities.getRandomString
 import com.celzero.bravedns.util.Utilities.isAtleastO
 import com.celzero.bravedns.util.Utilities.isFdroidFlavour
 import com.celzero.bravedns.util.Utilities.isPlayStoreFlavour
+import com.celzero.bravedns.util.Utilities.isWebsiteDegoogledFlavour
 import com.celzero.bravedns.util.Utilities.showToastUiCentered
 import com.celzero.bravedns.util.disableFrostTemporarily
 import com.celzero.bravedns.util.restoreFrost
 import com.celzero.firestack.intra.Intra
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import org.koin.android.ext.android.inject
 import org.koin.core.component.KoinComponent
 import java.io.File
@@ -208,12 +212,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                     val text = persistentState.firebaseUserToken
+                    val ctx = context ?: return false
                     val clipboard =
-                        getSystemService(requireContext(), ClipboardManager::class.java)
+                        getSystemService(ctx, ClipboardManager::class.java)
                     val clip = ClipData.newPlainText("token", text)
                     clipboard?.setPrimaryClip(clip)
 
-                    Toast.makeText(requireContext(), "Copied to clipboard", Toast.LENGTH_SHORT)
+                    Toast.makeText(ctx, "Copied to clipboard", Toast.LENGTH_SHORT)
                         .show()
                     return true
                 }
@@ -223,8 +228,9 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
 
                     val newToken = generateNewToken()
                     b.tokenTextView.text = newToken
+                    val ctx = context ?: return true
                     Toast.makeText(
-                        requireContext(),
+                        ctx,
                         getString(R.string.config_add_success_toast),
                         Toast.LENGTH_SHORT
                     ).show()
@@ -272,7 +278,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun getLastUpdatedTs(): String {
-        val pInfo: PackageInfo? = getPackageMetadata(requireContext().packageManager, requireContext().packageName)
+        val ctx = context ?: return ""
+        val pInfo: PackageInfo? = getPackageMetadata(ctx.packageManager, ctx.packageName)
         // TODO: modify this to use the latest version code api
         val updatedTs = pInfo?.lastUpdateTime ?: return ""
         return if (updatedTs > 0) {
@@ -306,14 +313,16 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun getVersionName(): String {
+        val ctx = context ?: return ""
         val pInfo: PackageInfo? =
-            getPackageMetadata(requireContext().packageManager, requireContext().packageName)
+            getPackageMetadata(ctx.packageManager, ctx.packageName)
         return pInfo?.versionName ?: ""
     }
 
     private fun getSponsorInfo(): String {
-        val installTime = requireContext().packageManager.getPackageInfo(
-            requireContext().packageName,
+        val ctx = context ?: return ""
+        val installTime = ctx.packageManager.getPackageInfo(
+            ctx.packageName,
             0
         ).firstInstallTime
         val timeDiff = System.currentTimeMillis() - installTime
@@ -329,6 +338,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun getDownloadSource(): String {
+        if (isWebsiteDegoogledFlavour()) return getString(R.string.build_flavor_website_degoogled)
+
         if (isFdroidFlavour()) return getString(R.string.build__flavor_fdroid)
 
         if (isPlayStoreFlavour()) return getString(R.string.build__flavor_play_store)
@@ -473,7 +484,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
 
     private fun enableTestMode() {
         persistentState.appTestMode = true
-        showToastUiCentered(requireContext(), "Test mode enabled", Toast.LENGTH_SHORT)
+        val ctx = context ?: return
+        showToastUiCentered(ctx, "Test mode enabled", Toast.LENGTH_SHORT)
         Logger.i(LOG_TAG_UI, "Test mode enabled")
         logEvent(EventType.UI_TOGGLE, "Test mode enabled", "User enabled test mode")
     }
@@ -651,34 +663,84 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun openStatsDialog() {
-        io {
-            val stat = VpnController.getNetStat()
-            val formatedStat = UIUtils.formatNetStat(stat) ?: ""
-            val vpnStats = VpnController.vpnStats() ?: ""
-            val stats = formatedStat + vpnStats
-            uiCtx {
-                if (!isAdded) return@uiCtx
-                val ctx = requireContext()
-                val pad = resources.getDimensionPixelSize(R.dimen.dots_margin_bottom)
+        if (!isAdded) return
+        val ctx = requireContext()
+        val pad = resources.getDimensionPixelSize(R.dimen.dots_margin_bottom)
+        val notAvailable = ctx.getString(R.string.lbl_not_available_short)
 
-                val tv = android.widget.TextView(ctx).apply {
-                    setPadding(pad, pad / 2, pad, pad)
-                    text = stats.ifEmpty { requireContext().getString(R.string.lbl_not_available_short) }
-                    setTextIsSelectable(true)
-                    typeface = android.graphics.Typeface.MONOSPACE
-                    textSize = 11.5f
+        val progressDialog = MaterialAlertDialogBuilder(ctx, R.style.App_Dialog_NoDim)
+            .setTitle(getString(R.string.title_statistics))
+            .setView(android.widget.ProgressBar(ctx).apply { isIndeterminate = true })
+            .setCancelable(true)
+            .setPositiveButton(R.string.fapps_info_dialog_positive_btn) { d, _ -> d.dismiss() }
+            .create()
+        progressDialog.show()
+
+        io {
+            val (stats, timedOut) = try {
+                val result = withTimeout(5000L.milliseconds) {
+                    val stat = VpnController.getNetStat()
+                    val formatedStat = UIUtils.formatNetStat(stat) ?: ""
+                    val vpnStats = VpnController.vpnStats() ?: ""
+                    formatedStat + vpnStats
                 }
-                val scrollView = android.widget.ScrollView(ctx).apply {
-                    addView(tv)
-                    scrollBarStyle = android.widget.ScrollView.SCROLLBARS_INSIDE_OVERLAY
+                result to false
+            } catch (_: TimeoutCancellationException) {
+                ctx.getString(R.string.lbl_not_available_short) to true
+            }
+
+            val lines = if (stats.isBlank()) {
+                listOf(notAvailable)
+            } else {
+                if (timedOut) listOf("Stats collection timed out, partial results:\n") + stats.split('\n')
+                else stats.split('\n')
+            }
+            val clipText = if (timedOut) "TIMED OUT\n$stats" else stats.ifEmpty { notAvailable }
+
+            uiCtx {
+                progressDialog.dismiss()
+                if (!isAdded) return@uiCtx
+
+                // use recycler as using textview with large stats causes OOM and ANR issues
+                val recyclerView = androidx.recyclerview.widget.RecyclerView(ctx).apply {
+                    layoutManager = androidx.recyclerview.widget.LinearLayoutManager(ctx)
+                    setHasFixedSize(true)
+                    adapter = object : androidx.recyclerview.widget.RecyclerView.Adapter<
+                            androidx.recyclerview.widget.RecyclerView.ViewHolder>() {
+                        override fun getItemCount() = lines.size
+                        override fun onCreateViewHolder(
+                            parent: android.view.ViewGroup,
+                            viewType: Int
+                        ): androidx.recyclerview.widget.RecyclerView.ViewHolder {
+                            val tv = android.widget.TextView(ctx).apply {
+                                setPadding(pad, 1, pad, 1)
+                                typeface = android.graphics.Typeface.MONOSPACE
+                                textSize = 11.5f
+                                isFocusable = false
+                            }
+                            return object : androidx.recyclerview.widget.RecyclerView.ViewHolder(tv) {}
+                        }
+                        override fun onBindViewHolder(
+                            holder: androidx.recyclerview.widget.RecyclerView.ViewHolder,
+                            position: Int
+                        ) {
+                            (holder.itemView as android.widget.TextView).text = lines[position]
+                        }
+                    }
+                }
+
+                val container = android.widget.LinearLayout(ctx).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    addView(recyclerView, android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
                 }
 
                 MaterialAlertDialogBuilder(ctx, R.style.App_Dialog_NoDim)
                     .setTitle(getString(R.string.title_statistics))
-                    .setView(scrollView)
+                    .setView(container)
                     .setPositiveButton(R.string.fapps_info_dialog_positive_btn) { d, _ -> d.dismiss() }
                     .setNeutralButton(R.string.dns_info_neutral) { _, _ ->
-                        copyToClipboard("stats_dump", stats.orEmpty())
+                        copyToClipboard("stats_dump", clipText)
                         showToastUiCentered(
                             ctx,
                             getString(R.string.copied_clipboard),
@@ -687,7 +749,6 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
                     }.create()
                     .show()
             }
-            printSysEnvAndProps()
         }
     }
 
@@ -712,7 +773,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             val auxv = KernelProc.getStats(forceRefresh = true)
             val stat = GoVpnAdapter.getGoMetrics()
             val formatedMetrics = UIUtils.formatNetMetrics(stat)
-            val memMetrics = MemoryUtils.getMemoryStats(requireContext())
+            val ctx = context
+            val memMetrics = if (ctx != null) MemoryUtils.getMemoryStats(ctx) else ""
             uiCtx {
                 if (!isAdded) return@uiCtx
                 showProcDialog(allThreadsSched, status, smaps, auxv, formatedMetrics, memMetrics)
@@ -802,12 +864,14 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         otherSection("STATUS  (/proc/self/status)", status)
         otherSection("SMAPS  (/proc/self/smaps_rollup)", smaps)
         otherSection("AUXV  (/proc/self/auxv)", auxv)
-        otherSection("Memory Metrics", memMetrics)
 
         val clipText = buildString {
             appendLine("=== PROC / MEM ===")
             appendLine(otherSpan.toString())
             appendLine("=== METRICS ===")
+            appendLine("Memory Metrics")
+            appendLine(memMetrics)
+            appendLine()
             appendLine(formatedMetrics.orEmpty())
         }
 
@@ -850,7 +914,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         val procScrollView    = makeScrollableSpannable(otherSpan)
-        val metricsScrollView = makeScrollableText(formatedMetrics)
+        val metricsContent = buildString {
+            appendLine("Memory Metrics")
+            appendLine(memMetrics)
+            appendLine()
+            appendLine(formatedMetrics.orEmpty())
+        }
+        val metricsScrollView = makeScrollableText(metricsContent)
 
         val tabProc    = makeTabButton("Threads / Proc / Mem")
         val tabMetrics = makeTabButton("Metrics")
@@ -1141,7 +1211,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
      * @return true if at least one log file exists, false otherwise
      */
     private fun hasAnyLogsAvailable(): Boolean {
-        val dir = requireContext().filesDir
+        val ctx = context ?: return false
+        val dir = ctx.filesDir
 
         val bugReportZip = File(getZipFileName(dir))
         if (bugReportZip.exists() && bugReportZip.length() > 0) {
@@ -1149,7 +1220,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         if (isAtleastO()) {
-            val tombstoneZip = EnhancedBugReport.getTombstoneZipFile(requireContext())
+            val tombstoneZip = EnhancedBugReport.getTombstoneZipFile(ctx)
             if (tombstoneZip != null && tombstoneZip.exists() && tombstoneZip.length() > 0) {
                 return true
             }
@@ -1186,7 +1257,8 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun openNotificationSettings() {
-        val packageName = requireContext().packageName
+        val ctx = context ?: return
+        val packageName = ctx.packageName
         try {
             val intent = Intent()
             if (isAtleastO()) {
@@ -1200,7 +1272,7 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
             startActivity(intent)
         } catch (e: ActivityNotFoundException) {
             showToastUiCentered(
-                requireContext(),
+                ctx,
                 getString(R.string.notification_screen_error),
                 Toast.LENGTH_SHORT
             )
@@ -1266,11 +1338,12 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun promptCrashLogAction() {
+        val ctx = context ?: return
         // ensure tombstone logs are added to zip if available
         if (isAtleastO()) {
             io {
                 try {
-                    EnhancedBugReport.addLogsToZipFile(requireContext())
+                    EnhancedBugReport.addLogsToZipFile(ctx)
                 } catch (e: Exception) {
                     Logger.w(LOG_TAG_UI, "err adding tombstone to zip: ${e.message}", e)
                 }
@@ -1278,13 +1351,13 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
         }
 
         // see if bug report files exist
-        val dir = requireContext().filesDir
+        val dir = ctx.filesDir
         val zipPath = getZipFileName(dir)
         val zipFile = File(zipPath)
 
         if (!zipFile.exists() || zipFile.length() <= 0) {
             showToastUiCentered(
-                requireContext(),
+                ctx,
                 getString(R.string.log_file_not_available),
                 Toast.LENGTH_SHORT
             )
@@ -1297,13 +1370,14 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun handleShowAppExitInfo() {
-        if (WorkScheduler.isWorkRunning(requireContext(), WorkScheduler.APP_EXIT_INFO_JOB_TAG))
+        val ctx = context ?: return
+        if (WorkScheduler.isWorkRunning(ctx, WorkScheduler.APP_EXIT_INFO_JOB_TAG))
             return
 
         workScheduler.scheduleOneTimeWorkForAppExitInfo()
         showBugReportProgressUi()
 
-        val workManager = WorkManager.getInstance(requireContext().applicationContext)
+        val workManager = WorkManager.getInstance(ctx.applicationContext)
         workManager.getWorkInfosByTagLiveData(WorkScheduler.APP_EXIT_INFO_ONE_TIME_JOB_TAG).observe(
             viewLifecycleOwner
         ) { workInfoList ->
@@ -1329,8 +1403,9 @@ class AboutFragment : Fragment(R.layout.fragment_about), View.OnClickListener, K
     }
 
     private fun onAppExitInfoFailure() {
+        val ctx = context ?: return
         showToastUiCentered(
-            requireContext(),
+            ctx,
             getString(R.string.log_file_not_available),
             Toast.LENGTH_SHORT
         )

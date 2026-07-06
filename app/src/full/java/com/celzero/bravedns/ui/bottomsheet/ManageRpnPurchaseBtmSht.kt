@@ -366,7 +366,7 @@ class ManageRpnPurchaseBtmSht : BottomSheetDialogFragment() {
 
     private fun showDialogConfirmCancelOrRevoke(isCancel: Boolean) {
         try {
-            MaterialAlertDialogBuilder(requireContext())
+            MaterialAlertDialogBuilder(requireContext(), R.style.App_Dialog_NoDim)
                 .setTitle(if (isCancel) getString(R.string.confirm_cancel_title) else getString(R.string.confirm_revoke_title))
                 .setMessage(if (isCancel) getString(R.string.confirm_cancel_message) else getString(R.string.confirm_revoke_message))
                 .setPositiveButton(if (isCancel) getString(R.string.cancel_subscription) else getString(R.string.revoke_subscription)) { _, _ ->

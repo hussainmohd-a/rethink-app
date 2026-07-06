@@ -40,6 +40,7 @@ import com.celzero.bravedns.util.Utilities.showToastUiCentered
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -168,7 +169,7 @@ class BugReportFilesBottomSheet : BottomSheetDialogFragment() {
 
         // bug report zip
         val bugReportZip = File(BugReportZipper.getZipFileName(dir))
-        if (bugReportZip.exists() && bugReportZip.length() > 0) {
+        if (bugReportZip.exists() && bugReportZip.length() != 0L) {
             files.add(
                 BugReportFile(
                     file = bugReportZip,
@@ -182,7 +183,7 @@ class BugReportFilesBottomSheet : BottomSheetDialogFragment() {
         // tombstone zip
         if (isAtleastO()) {
             val tombstoneZip = EnhancedBugReport.getTombstoneZipFile(requireContext())
-            if (tombstoneZip != null && tombstoneZip.exists() && tombstoneZip.length() > 0) {
+            if (tombstoneZip != null && tombstoneZip.exists() && tombstoneZip.length() != 0L) {
                 files.add(
                     BugReportFile(
                         file = tombstoneZip,
@@ -198,7 +199,7 @@ class BugReportFilesBottomSheet : BottomSheetDialogFragment() {
         val bugReportDir = File(dir, BugReportZipper.BUG_REPORT_DIR_NAME)
         if (bugReportDir.exists() && bugReportDir.isDirectory) {
             bugReportDir.listFiles()?.forEach { file ->
-                if (file.isFile && file.length() > 0) {
+                if (file.isFile && file.length() != 0L) {
                     files.add(
                         BugReportFile(
                             file = file,
@@ -216,7 +217,7 @@ class BugReportFilesBottomSheet : BottomSheetDialogFragment() {
             val tombstoneDir = File(dir, EnhancedBugReport.TOMBSTONE_DIR_NAME)
             if (tombstoneDir.exists() && tombstoneDir.isDirectory) {
                 tombstoneDir.listFiles()?.forEach { file ->
-                    if (file.isFile && file.length() > 0) {
+                    if (file.isFile && file.length() != 0L) {
                         files.add(
                             BugReportFile(
                                 file = file,
@@ -481,7 +482,7 @@ class BugReportFilesBottomSheet : BottomSheetDialogFragment() {
     }
 
     private fun showDeleteConfirmationDialog(fileItem: BugReportFile) {
-        val dialog = com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
+        val dialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.lbl_delete))
             .setMessage(getString(R.string.bug_report_delete_confirmation, fileItem.name))
             .setPositiveButton(getString(R.string.lbl_delete)) { _, _ ->

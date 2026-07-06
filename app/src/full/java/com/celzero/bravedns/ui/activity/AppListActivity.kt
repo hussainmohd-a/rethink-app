@@ -476,7 +476,7 @@ class AppListActivity :
 
     private fun showBulkRulesUpdateDialog(title: String, message: String, type: BlockType) {
         val builder =
-            AlertDialog.Builder(this)
+            MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
                 .setTitle(title)
                 .setMessage(message)
                 .setPositiveButton(getString(R.string.lbl_apply)) { _, _ -> updateBulkRules(type) }

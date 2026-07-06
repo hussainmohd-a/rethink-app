@@ -128,13 +128,6 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
     override fun onResume() {
         super.onResume()
         handleLockdownModeIfNeeded()
-        showNewBadgeIfNeeded()
-    }
-
-    private fun showNewBadgeIfNeeded() {
-        val showBadge =
-            NewSettingsManager.shouldShowBadge(NewSettingsManager.WG_GLOBAL_LOCKDOWN_MODE_SETTING)
-        b.dvWgLockdownTxt.setBadgeDotVisible(this, showBadge)
     }
 
     private fun initView() {
@@ -320,6 +313,10 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
             if (isChecked) {
                 val sheet = RethinkInRethinkWarningBottomSheet()
                 sheet.onProceed = {
+                    val rethinkUid = android.os.Process.myUid()
+                    io {
+                        FirewallManager.exemptRethinkApp(rethinkUid)
+                    }
                     if (!persistentState.useMultipleNetworks) {
                         b.settingsActivityAllNetworkSwitch.isChecked = true
                         persistentState.useMultipleNetworks = true
@@ -330,11 +327,6 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
                         "Rethink in Rethink enabled"
                     )
                     displayRethinkInRethinkUi()
-                    val rethinkUid = Utilities.getApplicationInfo(this, this.packageName)?.uid
-                    io {
-                        if (rethinkUid != null) FirewallManager.exemptRethinkApp(rethinkUid)
-                        else Logger.e(LOG_TAG_UI, "TunSetting Rethink UID is null")
-                    }
                 }
                 sheet.onCancel = {
                     b.settingsRInRSwitch.isChecked = false
@@ -506,7 +498,6 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
         }
 
         b.dvWgLockdownRl.setOnClickListener {
-            NewSettingsManager.markSettingSeen(NewSettingsManager.WG_GLOBAL_LOCKDOWN_MODE_SETTING)
             b.dvWgLockdownSwitch.isChecked = !b.dvWgLockdownSwitch.isChecked
         }
 
@@ -841,24 +832,10 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
         if (persistentState.routeRethinkInRethink) {
             b.genRInRDesc.text = getString(R.string.settings_rinr_desc_enabled)
             disableBandwidthBoosterUi()
-            disableProxyLockdownUi()
         } else {
             b.genRInRDesc.text = getString(R.string.settings_rinr_desc_disabled)
             enableBandwidthBoosterUi()
-            enableProxyLockdownUi()
         }
-    }
-
-    private fun disableProxyLockdownUi() {
-        b.dvWgLockdownRl.alpha = ALPHA_DISABLED
-        b.dvWgLockdownSwitch.isEnabled = false
-        b.dvWgLockdownRl.isEnabled = false
-    }
-
-    private fun enableProxyLockdownUi() {
-        b.dvWgLockdownRl.alpha = ALPHA_ENABLED
-        b.dvWgLockdownSwitch.isEnabled = true
-        b.dvWgLockdownRl.isEnabled = true
     }
 
     private fun disableBandwidthBoosterUi() {

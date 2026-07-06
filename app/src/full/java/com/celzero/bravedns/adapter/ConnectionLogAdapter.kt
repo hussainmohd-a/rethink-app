@@ -21,12 +21,11 @@ import Logger.LOG_TAG_UI
 import android.content.Context
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.Process
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
-import androidx.core.view.ViewCompat.isAttachedToWindow
-import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
@@ -38,6 +37,10 @@ import com.bumptech.glide.Glide
 import com.celzero.bravedns.R
 import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
 import com.celzero.bravedns.database.ConnectionTracker
+import com.celzero.bravedns.database.MergedConnectionLog
+import com.celzero.bravedns.database.RethinkLog
+import com.celzero.bravedns.database.toConnectionTracker
+import com.celzero.bravedns.database.toRethinkLog
 import com.celzero.bravedns.databinding.ListItemConnTrackBinding
 import com.celzero.bravedns.service.FirewallManager
 import com.celzero.bravedns.service.FirewallRuleset
@@ -60,20 +63,26 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
 
-class ConnectionTrackerAdapter(private val context: Context) :
-    PagingDataAdapter<ConnectionTracker, ConnectionTrackerAdapter.ConnectionTrackerViewHolder>(
+class ConnectionLogAdapter(private val context: Context) :
+    PagingDataAdapter<MergedConnectionLog, ConnectionLogAdapter.ConnectionLogViewHolder>(
         DIFF_CALLBACK
     ) {
 
     companion object {
         private val DIFF_CALLBACK =
-            object : DiffUtil.ItemCallback<ConnectionTracker>() {
+            object : DiffUtil.ItemCallback<MergedConnectionLog>() {
 
-                override fun areItemsTheSame(old: ConnectionTracker, new: ConnectionTracker): Boolean {
-                    return old.id == new.id
+                override fun areItemsTheSame(
+                    old: MergedConnectionLog,
+                    new: MergedConnectionLog
+                ): Boolean {
+                    return old.id == new.id && old.source == new.source
                 }
 
-                override fun areContentsTheSame(old: ConnectionTracker, new: ConnectionTracker): Boolean {
+                override fun areContentsTheSame(
+                    old: MergedConnectionLog,
+                    new: MergedConnectionLog
+                ): Boolean {
                     return old == new
                 }
             }
@@ -83,31 +92,34 @@ class ConnectionTrackerAdapter(private val context: Context) :
         private const val MAX_TIME_UDP = 135 // seconds
         private const val NO_USER_ID = 0
         private const val RTT_SHORT_THRESHOLD_MS = 20 // milliseconds
-        private const val TAG = "ConnTrackAdapter"
+        private const val TAG = "ConnLogAdapter"
+
+        const val DNS_IP_TEMPLATE_V4 = "10.111.222.3"
+        const val DNS_IP_TEMPLATE_V6 = "fd66:f83a:c650::3"
     }
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ConnectionTrackerViewHolder {
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ConnectionLogViewHolder {
         val itemBinding =
             ListItemConnTrackBinding.inflate(
                 LayoutInflater.from(parent.context),
                 parent,
                 false
             )
-        return ConnectionTrackerViewHolder(itemBinding)
+        return ConnectionLogViewHolder(itemBinding)
     }
 
-    override fun onBindViewHolder(holder: ConnectionTrackerViewHolder, position: Int) {
-        val connTracker: ConnectionTracker? = getItem(position)
+    override fun onBindViewHolder(holder: ConnectionLogViewHolder, position: Int) {
+        val log: MergedConnectionLog? = getItem(position)
 
-        if (connTracker == null) {
+        if (log == null) {
             holder.clear()
             return
         }
-        holder.update(connTracker)
-        holder.setTag(connTracker)
+        holder.update(log)
+        holder.setTag(log)
     }
 
-    inner class ConnectionTrackerViewHolder(private val b: ListItemConnTrackBinding) :
+    inner class ConnectionLogViewHolder(private val b: ListItemConnTrackBinding) :
         RecyclerView.ViewHolder(b.root) {
 
         fun clear() {
@@ -123,94 +135,99 @@ class ConnectionTrackerAdapter(private val context: Context) :
             b.connectionSummaryLl.visibility = View.GONE
         }
 
-        fun update(connTracker: ConnectionTracker) {
-            displayTransactionDetails(connTracker)
-            displayProtocolDetails(connTracker.port, connTracker.protocol)
-            displayAppDetails(connTracker)
-            displaySummaryDetails(connTracker)
-            // case: when the rule is set to RULE12 but no proxy is set, consider this as error
-            // handle this as special case, and display the RULE1C hint
-            // RULE1C is the hint for RULE12 with no proxy set.
-            val blocked = if (connTracker.blockedByRule == FirewallRuleset.RULE12.id) {
-                connTracker.proxyDetails.isEmpty()
+        fun update(log: MergedConnectionLog) {
+            displayTransactionDetails(log)
+            displayProtocolDetails(log.port, log.protocol)
+            displayAppDetails(log)
+            displaySummaryDetails(log)
+            val blocked = if (log.blockedByRule == FirewallRuleset.RULE12.id) {
+                log.proxyDetails.isEmpty()
             } else {
-                connTracker.isBlocked
+                log.isBlocked
             }
-            val rule = if (connTracker.blockedByRule == FirewallRuleset.RULE12.id && connTracker.proxyDetails.isEmpty()) {
+            val rule = if (log.blockedByRule == FirewallRuleset.RULE12.id && log.proxyDetails.isEmpty()) {
                 FirewallRuleset.RULE18.id
             } else {
-                connTracker.blockedByRule
+                log.blockedByRule
             }
             displayFirewallRulesetHint(blocked, rule)
 
-            b.connectionParentLayout.setOnClickListener { openBottomSheet(connTracker) }
+            b.connectionParentLayout.setOnClickListener { openBottomSheet(log) }
         }
 
-        fun setTag(connTracker: ConnectionTracker) {
-            b.connectionResponseTime.tag = connTracker.timeStamp
-            b.root.tag = connTracker.timeStamp
+        fun setTag(log: MergedConnectionLog) {
+            b.connectionResponseTime.tag = log.timeStamp
+            b.root.tag = log.timeStamp
         }
 
-        private fun openBottomSheet(ct: ConnectionTracker) {
+        private fun openBottomSheet(log: MergedConnectionLog) {
             if (context !is FragmentActivity) {
-                Logger.w(LOG_TAG_UI, "$TAG err opening the connection tracker bottomsheet")
+                Logger.w(LOG_TAG_UI, "$TAG err opening the connection log bottomsheet")
                 return
             }
 
-            Logger.vv(LOG_TAG_UI, "$TAG show bottom sheet for ${ct.appName}")
+            Logger.vv(LOG_TAG_UI, "$TAG show bottom sheet for ${log.appName}")
             val bottomSheetFragment = ConnTrackerBottomSheet()
-            // see AppIpRulesAdapter.kt#openBottomSheet()
             val bundle = Bundle()
-            bundle.putString(ConnTrackerBottomSheet.INSTANCE_STATE_IPDETAILS, Gson().toJson(ct))
+            val json = if (log.isConnectionTracker()) {
+                Gson().toJson(log.toConnectionTracker())
+            } else {
+                Gson().toJson(log.toRethinkLog())
+            }
+            bundle.putString(ConnTrackerBottomSheet.INSTANCE_STATE_IPDETAILS, json)
             bottomSheetFragment.arguments = bundle
             bottomSheetFragment.show(context.supportFragmentManager, bottomSheetFragment.tag)
         }
 
-        private fun displayTransactionDetails(connTracker: ConnectionTracker) {
+        private fun displayTransactionDetails(log: MergedConnectionLog) {
             val time = if (DEBUG) {
-                Utilities.convertLongToTime(connTracker.timeStamp, TIME_FORMAT_5)
+                Utilities.convertLongToTime(log.timeStamp, TIME_FORMAT_5)
             } else {
-                Utilities.convertLongToTime(connTracker.timeStamp, TIME_FORMAT_1)
+                Utilities.convertLongToTime(log.timeStamp, TIME_FORMAT_1)
             }
             b.connectionResponseTime.text = time
-            b.connectionFlag.text = connTracker.flag
+            b.connectionFlag.text = log.flag
 
-            if (connTracker.dnsQuery.isNullOrEmpty()) {
-                b.connectionIpAddress.text = connTracker.ipAddress
+            if (log.ipAddress == DNS_IP_TEMPLATE_V4 || log.ipAddress == DNS_IP_TEMPLATE_V6) {
+                b.connectionIpAddress.text = context.getString(R.string.dns_mode_info_title)
+            } else {
+                b.connectionIpAddress.text = log.ipAddress
+            }
+
+            if (log.dnsQuery.isNullOrEmpty()) {
                 b.connectionDomain.visibility = View.GONE
             } else {
-                b.connectionIpAddress.text = connTracker.ipAddress
-                b.connectionDomain.text = connTracker.dnsQuery
+                b.connectionDomain.text = log.dnsQuery
                 b.connectionDomain.visibility = View.VISIBLE
-                // marquee is not working for the textview, hence the workaround.
                 b.connectionDomain.isSelected = true
             }
         }
 
-        private fun displayAppDetails(ct: ConnectionTracker) {
+        private fun displayAppDetails(log: MergedConnectionLog) {
             io {
                 uiCtx {
-                    val apps = FirewallManager.getPackageNamesByUid(ct.uid)
+                    val apps = FirewallManager.getPackageNamesByUid(log.uid)
                     val count = apps.count()
+                    val pkgName = log.packageName ?: ""
 
                     val appName = when {
-                        ct.usrId != NO_USER_ID -> context.getString(
+                        log.usrId != NO_USER_ID -> context.getString(
                             R.string.about_version_install_source,
-                            ct.appName,
-                            ct.usrId.toString()
+                            log.appName,
+                            log.usrId.toString()
                         )
 
                         count > 1 -> context.getString(
                             R.string.ctbs_app_other_apps,
-                            ct.appName,
+                            log.appName,
                             "${count - 1}"
                         )
 
-                        else -> ct.appName
+                        else -> log.appName
                     }
 
                     b.connectionAppName.text = appName
-                    if (apps.isEmpty() || ct.packageName.isEmpty() || ct.packageName == EMPTY_PACKAGE_NAME) {
+                    if (apps.isEmpty() || pkgName.isEmpty() || pkgName == EMPTY_PACKAGE_NAME) {
                         loadAppIcon(getDefaultIcon(context))
                     } else {
                         loadAppIcon(getIcon(context, apps[0]))
@@ -220,16 +237,12 @@ class ConnectionTrackerAdapter(private val context: Context) :
         }
 
         private fun displayProtocolDetails(port: Int, proto: Int) {
-            // If the protocol is not TCP or UDP, then display the protocol name.
             if (Protocol.UDP.protocolType != proto && Protocol.TCP.protocolType != proto) {
                 b.connLatencyTxt.text = Protocol.getProtocolName(proto).name
                 return
             }
 
-            // Instead of displaying the port number, display the service name if it is known.
-            // https://github.com/celzero/rethink-app/issues/42 - #3 - transport + protocol.
             val resolvedPort = KnownPorts.resolvePort(port)
-            // case: for UDP/443 label it as HTTP3 instead of HTTPS
             b.connLatencyTxt.text =
                 if (port == KnownPorts.HTTPS_PORT && proto == Protocol.UDP.protocolType) {
                     context.getString(R.string.connection_http3)
@@ -242,7 +255,6 @@ class ConnectionTrackerAdapter(private val context: Context) :
 
         private fun displayFirewallRulesetHint(isBlocked: Boolean, ruleName: String?) {
             when {
-                // hint red when blocked
                 isBlocked -> {
                     b.connectionStatusIndicator.visibility = View.VISIBLE
                     val isError = FirewallRuleset.isProxyError(ruleName)
@@ -256,32 +268,32 @@ class ConnectionTrackerAdapter(private val context: Context) :
                         )
                     }
                 }
-                // hint white when whitelisted
+
                 (FirewallRuleset.shouldShowHint(ruleName)) -> {
                     b.connectionStatusIndicator.visibility = View.VISIBLE
                     b.connectionStatusIndicator.setBackgroundColor(
                         ContextCompat.getColor(context, R.color.primaryLightColorText)
                     )
                 }
-                // no hints, otherwise
+
                 else -> {
                     b.connectionStatusIndicator.visibility = View.INVISIBLE
                 }
             }
         }
 
-        private fun displaySummaryDetails(ct: ConnectionTracker) {
+        private fun displaySummaryDetails(log: MergedConnectionLog) {
             io {
-                val hasCid = VpnController.hasCid(ct.connId, ct.uid)
-                val connType = ConnectionTracker.ConnType.get(ct.connType)
+                val hasCid = VpnController.hasCid(log.connId, log.uid)
+                val connType = ConnectionTracker.ConnType.get(log.connType)
                 uiCtx {
                     b.connectionDataUsage.text = ""
                     b.connectionDelay.text = ""
                     if (
-                        ct.duration == 0 &&
-                        ct.downloadBytes == 0L &&
-                        ct.uploadBytes == 0L &&
-                        ct.message.isEmpty()
+                        log.duration == 0 &&
+                        log.downloadBytes == 0L &&
+                        log.uploadBytes == 0L &&
+                        log.message.isEmpty()
                     ) {
                         var hasMinSummary = false
                         if (hasCid) {
@@ -292,7 +304,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                             hasMinSummary = true
                         } else {
                             b.connectionDataUsage.text = ""
-                            b.connectionDuration.text =""
+                            b.connectionDuration.text = ""
                         }
                         if (connType.isMetered()) {
                             b.connectionDelay.text = context.getString(R.string.symbol_currency)
@@ -301,7 +313,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                             b.connectionDelay.text = ""
                         }
 
-                        if (isRpnProxy(ct.rpid)) {
+                        if (isRpnProxy(log.rpid)) {
                             b.connectionSummaryLl.visibility = View.VISIBLE
                             b.connectionDelay.text =
                                 context.getString(
@@ -309,7 +321,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                                     b.connectionDelay.text,
                                     context.getString(R.string.symbol_sparkle)
                                 )
-                        } else if (isConnectionProxied(ct.blockedByRule, ct.proxyDetails)) {
+                        } else if (isConnectionProxied(log.blockedByRule, log.proxyDetails)) {
                             b.connectionSummaryLl.visibility = View.VISIBLE
                             b.connectionDelay.text =
                                 context.getString(
@@ -326,18 +338,17 @@ class ConnectionTrackerAdapter(private val context: Context) :
                     }
 
                     b.connectionSummaryLl.visibility = View.VISIBLE
-                    val duration = getDurationInHumanReadableFormat(context, ct.duration)
+                    val duration = getDurationInHumanReadableFormat(context, log.duration)
                     b.connectionDuration.text = context.getString(R.string.single_argument, duration)
-                    // add unicode for download and upload
                     val download =
                         context.getString(
                             R.string.symbol_download,
-                            Utilities.humanReadableByteCount(ct.downloadBytes, true)
+                            Utilities.humanReadableByteCount(log.downloadBytes, true)
                         )
                     val upload =
                         context.getString(
                             R.string.symbol_upload,
-                            Utilities.humanReadableByteCount(ct.uploadBytes, true)
+                            Utilities.humanReadableByteCount(log.uploadBytes, true)
                         )
                     b.connectionDataUsage.text = context.getString(R.string.two_argument, upload, download)
                     b.connectionDelay.text = ""
@@ -349,7 +360,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                                 context.getString(R.string.symbol_currency)
                             )
                     }
-                    if (isConnectionHeavier(ct)) {
+                    if (isConnectionHeavier(log)) {
                         b.connectionDelay.text =
                             context.getString(
                                 R.string.ci_desc,
@@ -357,7 +368,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                                 context.getString(R.string.symbol_heavy)
                             )
                     }
-                    if (isConnectionSlower(ct)) {
+                    if (isConnectionSlower(log)) {
                         b.connectionDelay.text =
                             context.getString(
                                 R.string.ci_desc,
@@ -365,9 +376,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                                 context.getString(R.string.symbol_turtle)
                             )
                     }
-                    // bunny in case rpid as present, key in case of proxy
-                    // bunny and key indicate conn is proxied, so its enough to show one of them
-                    if (isRpnProxy(ct.rpid)) {
+                    if (isRpnProxy(log.rpid)) {
                         b.connectionSummaryLl.visibility = View.VISIBLE
                         b.connectionDelay.text =
                             context.getString(
@@ -375,14 +384,14 @@ class ConnectionTrackerAdapter(private val context: Context) :
                                 b.connectionDelay.text,
                                 context.getString(R.string.symbol_sparkle)
                             )
-                    } else if (containsRelayProxy(ct.rpid)) {
+                    } else if (containsRelayProxy(log.rpid)) {
                         b.connectionDelay.text =
                             context.getString(
                                 R.string.ci_desc,
                                 b.connectionDelay.text,
                                 context.getString(R.string.symbol_bunny)
                             )
-                    } else if (isConnectionProxied(ct.blockedByRule, ct.proxyDetails)) {
+                    } else if (isConnectionProxied(log.blockedByRule, log.proxyDetails)) {
                         b.connectionDelay.text =
                             context.getString(
                                 R.string.ci_desc,
@@ -391,8 +400,7 @@ class ConnectionTrackerAdapter(private val context: Context) :
                             )
                     }
 
-                    // rtt -> show rocket if less than 20ms, treat it as rtt
-                    if (isRoundTripShorter(ct.synack, ct.isBlocked)) {
+                    if (isRoundTripShorter(log.synack, log.isBlocked)) {
                         b.connectionDelay.text =
                             context.getString(
                                 R.string.ci_desc,
@@ -404,10 +412,8 @@ class ConnectionTrackerAdapter(private val context: Context) :
                     if (b.connectionDelay.text.isEmpty() && b.connectionDataUsage.text.isEmpty()) {
                         b.connectionSummaryLl.visibility = View.GONE
                     }
-
                 }
             }
-
         }
 
         private fun isRoundTripShorter(rtt: Long, blocked: Boolean): Boolean {
@@ -422,7 +428,6 @@ class ConnectionTrackerAdapter(private val context: Context) :
             if (ruleName == null) return false
             val rule = FirewallRuleset.getFirewallRule(ruleName) ?: return false
             val proxy = ProxyManager.isNotLocalAndRpnProxy(proxyDetails)
-            // show key symbol in case of proxy error too
             val isProxyError = FirewallRuleset.isProxyError(ruleName)
             return (FirewallRuleset.isProxied(rule) && proxyDetails.isNotEmpty() && proxy) || isProxyError
         }
@@ -431,13 +436,13 @@ class ConnectionTrackerAdapter(private val context: Context) :
             return pid.isNotEmpty() && ProxyManager.isRpnProxy(pid)
         }
 
-        private fun isConnectionHeavier(ct: ConnectionTracker): Boolean {
-            return ct.downloadBytes + ct.uploadBytes > MAX_BYTES
+        private fun isConnectionHeavier(log: MergedConnectionLog): Boolean {
+            return log.downloadBytes + log.uploadBytes > MAX_BYTES
         }
 
-        private fun isConnectionSlower(ct: ConnectionTracker): Boolean {
-            return (ct.protocol == Protocol.UDP.protocolType && ct.duration > MAX_TIME_UDP) ||
-                (ct.protocol == Protocol.TCP.protocolType && ct.duration > MAX_TIME_TCP)
+        private fun isConnectionSlower(log: MergedConnectionLog): Boolean {
+            return (log.protocol == Protocol.UDP.protocolType && log.duration > MAX_TIME_UDP) ||
+                (log.protocol == Protocol.TCP.protocolType && log.duration > MAX_TIME_TCP)
         }
 
         private fun loadAppIcon(drawable: Drawable?) {
