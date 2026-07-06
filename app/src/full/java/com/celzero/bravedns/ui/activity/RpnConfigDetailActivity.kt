@@ -379,18 +379,28 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         }
 
         // addr
-        val addrStart = 0
-        val addrs = info.addr.replace(",", ",\n")
-        sb.append(addrs)
-        val addrEnd = sb.length
-        sb.setSpan(StyleSpan(Typeface.BOLD),  addrStart, addrEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        sb.setSpan(TypefaceSpan("monospace"), addrStart, addrEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        sb.setSpan(RelativeSizeSpan(1.07f),   addrStart, addrEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        val addrs = info.addr.split(",")
 
-        val loc = if (info.city.isNotBlank() && info.cc.isNotBlank())
-            "${info.city} (${info.cc})"
-        else info.city.ifBlank { info.cc }
-        appendLine(loc, info.name)
+        addrs.forEachIndexed { index, addr ->
+            if (index == 1) { sb.append("\n") } else if (index > 1) { sb.append(" · ") }
+
+            val start = sb.length
+            sb.append(addr.trim())
+            val end = sb.length
+
+            sb.setSpan(
+                TypefaceSpan("monospace"),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            sb.setSpan(
+                RelativeSizeSpan(1.07f),
+                start,
+                end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
 
         return sb
     }
@@ -467,21 +477,21 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             val asn = meta.asn ?: ""
             val org = meta.asnOrg ?: ""
             val dom = meta.asnDom ?: ""
-            if (asn.isNotBlank()) add("AS$asn")
+            if (asn.isNotBlank()) add(asn)
             if (org.isNotBlank()) add(org)
             if (dom.isNotBlank()) add(dom)
         }
         if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString("  ·  "))
 
-        // loc
-        val locParts = buildList {
+        // loc, do not show client location for now as it is confusing
+        /*val locParts = buildList {
             val city = meta.city ?: ""
             val lat = meta.lat
             val lon = meta.lon
             if (city.isNotBlank()) add(city)
             if (lat != 0.0 || lon != 0.0) add(String.format(Locale.US, "%.4f°, %.4f°", lat, lon))
         }
-        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))
+        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))*/
 
         return sb
     }

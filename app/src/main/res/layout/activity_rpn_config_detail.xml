@@ -350,72 +350,6 @@
                             android:background="?attr/divider" />
 
                         <LinearLayout
-                            android:id="@+id/row_last_ok"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingTop="8dp"
-                            android:paddingBottom="8dp">
-
-                            <com.google.android.material.textview.MaterialTextView
-                                android:id="@+id/label_last_ok"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/lbl_last_handshake"
-                                android:textColor="?attr/primaryLightColorText"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.textview.MaterialTextView
-                                android:id="@+id/value_last_ok"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="?attr/primaryTextColor"
-                                android:textSize="13sp"
-                                tools:text="2 min ago" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="0.5dp"
-                            android:alpha="0.08"
-                            android:background="?attr/divider" />
-
-                        <LinearLayout
-                            android:id="@+id/row_last_open"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:gravity="center_vertical"
-                            android:orientation="horizontal"
-                            android:paddingTop="8dp"
-                            android:paddingBottom="8dp">
-
-                            <com.google.android.material.textview.MaterialTextView
-                                android:id="@+id/label_last_open"
-                                android:layout_width="0dp"
-                                android:layout_height="wrap_content"
-                                android:layout_weight="1"
-                                android:text="@string/lbl_last_handshake"
-                                android:textColor="?attr/primaryLightColorText"
-                                android:textSize="13sp" />
-
-                            <com.google.android.material.textview.MaterialTextView
-                                android:id="@+id/value_last_open"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:textColor="?attr/primaryTextColor"
-                                android:textSize="13sp"
-                                tools:text="2 min ago" />
-                        </LinearLayout>
-
-                        <View
-                            android:layout_width="match_parent"
-                            android:layout_height="0.5dp"
-                            android:alpha="0.08"
-                            android:background="?attr/divider" />
-
-                        <LinearLayout
                             android:id="@+id/row_ipv4"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
@@ -548,6 +482,72 @@
                                     android:textSize="13sp"
                                     android:visibility="gone" />
                             </FrameLayout>
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="0.5dp"
+                            android:alpha="0.08"
+                            android:background="?attr/divider" />
+
+                        <LinearLayout
+                            android:id="@+id/row_last_ok"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingTop="8dp"
+                            android:paddingBottom="8dp">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:id="@+id/label_last_ok"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/lbl_last_handshake"
+                                android:textColor="?attr/primaryLightColorText"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:id="@+id/value_last_ok"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="?attr/primaryTextColor"
+                                android:textSize="13sp"
+                                tools:text="2 min ago" />
+                        </LinearLayout>
+
+                        <View
+                            android:layout_width="match_parent"
+                            android:layout_height="0.5dp"
+                            android:alpha="0.08"
+                            android:background="?attr/divider" />
+
+                        <LinearLayout
+                            android:id="@+id/row_last_open"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal"
+                            android:paddingTop="8dp"
+                            android:paddingBottom="8dp">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:id="@+id/label_last_open"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/lbl_last_open"
+                                android:textColor="?attr/primaryLightColorText"
+                                android:textSize="13sp" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:id="@+id/value_last_open"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:textColor="?attr/primaryTextColor"
+                                android:textSize="13sp"
+                                tools:text="2 min ago" />
                         </LinearLayout>
 
                         <View
