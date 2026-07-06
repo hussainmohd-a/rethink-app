@@ -92,7 +92,7 @@ object FirewallManager : KoinComponent {
         EXCLUDE(3),
         ISOLATE(4),
         NONE(5),
-        UNTRACKED(6),
+        // UNTRACKED(6), unused, remove in future
         BYPASS_DNS_FIREWALL(7);
 
         companion object {
@@ -190,11 +190,6 @@ object FirewallManager : KoinComponent {
 
         fun isolate(): Boolean {
             return this == ISOLATE
-        }
-
-        // even invalid uids are considered as untracked
-        fun isUntracked(): Boolean {
-            return this == UNTRACKED
         }
     }
 
@@ -496,7 +491,7 @@ object FirewallManager : KoinComponent {
     }
 
     suspend fun appStatus(uid: Int): FirewallStatus {
-        val appInfo = getAppInfoByUid(uid) ?: return FirewallStatus.UNTRACKED
+        val appInfo = getAppInfoByUid(uid) ?: return FirewallStatus.NONE
 
         return when (appInfo.firewallStatus) {
             FirewallStatus.BYPASS_UNIVERSAL.id -> FirewallStatus.BYPASS_UNIVERSAL
@@ -929,9 +924,6 @@ object FirewallManager : KoinComponent {
             }
             FirewallStatus.ISOLATE -> {
                 R.string.isolate
-            }
-            FirewallStatus.UNTRACKED -> {
-                R.string.untracked
             }
             FirewallStatus.BYPASS_DNS_FIREWALL -> {
                 R.string.bypass_dns_firewall

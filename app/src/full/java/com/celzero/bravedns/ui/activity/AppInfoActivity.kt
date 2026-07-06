@@ -339,9 +339,6 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
                 }
                 disableWhitelistExcludeUi()
             }
-            FirewallManager.FirewallStatus.UNTRACKED -> {
-                // no-op
-            }
         }
     }
 
@@ -1000,7 +997,6 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
             FirewallManager.FirewallStatus.ISOLATE -> getString(R.string.ada_app_status_isolate)
             FirewallManager.FirewallStatus.BYPASS_DNS_FIREWALL ->
                 getString(R.string.ada_app_status_bypass_dns_firewall)
-            FirewallManager.FirewallStatus.UNTRACKED -> getString(R.string.ada_app_status_unknown)
         }
     }
 
@@ -1112,7 +1108,7 @@ class AppInfoActivity : BaseActivity(R.layout.activity_app_details) {
     }
 
     private fun logEvent(msg: String, details: String) {
-        eventLogger.log(EventType.FW_RULE_MODIFIED, Severity.LOW, msg, EventSource.UI, false, details)
+        eventLogger.log(EventType.FW_RULE_MODIFIED, Severity.LOW, msg, EventSource.UI, true, details)
     }
 
     private fun io(f: suspend () -> Unit): Job {

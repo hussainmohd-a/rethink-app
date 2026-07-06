@@ -340,13 +340,11 @@ class FirewallManagerTest : KoinTest {
         assertTrue(FirewallManager.FirewallStatus.BYPASS_DNS_FIREWALL.bypassDnsFirewall())
         assertTrue(FirewallManager.FirewallStatus.EXCLUDE.isExclude())
         assertTrue(FirewallManager.FirewallStatus.ISOLATE.isolate())
-        assertTrue(FirewallManager.FirewallStatus.UNTRACKED.isUntracked())
 
         assertFalse(FirewallManager.FirewallStatus.NONE.bypassUniversal())
         assertFalse(FirewallManager.FirewallStatus.NONE.bypassDnsFirewall())
         assertFalse(FirewallManager.FirewallStatus.NONE.isExclude())
         assertFalse(FirewallManager.FirewallStatus.NONE.isolate())
-        assertFalse(FirewallManager.FirewallStatus.NONE.isUntracked())
     }
 
     // Test ConnectionStatus enum
@@ -683,12 +681,6 @@ class FirewallManagerTest : KoinTest {
             FirewallManager.ConnectionStatus.ALLOW
         ))
 
-        assertEquals(R.string.untracked, FirewallManager.getLabelForStatus(
-            FirewallManager.FirewallStatus.UNTRACKED,
-            FirewallManager.ConnectionStatus.ALLOW,
-            FirewallManager.ConnectionStatus.ALLOW
-        ))
-
         assertEquals(R.string.bypass_dns_firewall, FirewallManager.getLabelForStatus(
             FirewallManager.FirewallStatus.BYPASS_DNS_FIREWALL,
             FirewallManager.ConnectionStatus.ALLOW,
@@ -835,7 +827,6 @@ class FirewallManagerTest : KoinTest {
         assertEquals(FirewallManager.FirewallStatus.NONE, FirewallManager.appStatus(testUid1))
         assertEquals(FirewallManager.FirewallStatus.ISOLATE, FirewallManager.appStatus(testUid2))
         assertEquals(FirewallManager.FirewallStatus.BYPASS_UNIVERSAL, FirewallManager.appStatus(systemUid))
-        assertEquals(FirewallManager.FirewallStatus.UNTRACKED, FirewallManager.appStatus(invalidUid))
     }
 
     // Test connectionStatus method

@@ -595,8 +595,6 @@ class ConnTrackerBottomSheet : BottomSheetDialogFragment(), KoinComponent {
         firewallStatus: FirewallManager.FirewallStatus,
         connStatus: FirewallManager.ConnectionStatus
     ) {
-        // no need to update the state if it's untracked
-        if (firewallStatus.isUntracked()) return
 
         when (firewallStatus) {
             FirewallManager.FirewallStatus.NONE -> {
@@ -626,9 +624,6 @@ class ConnTrackerBottomSheet : BottomSheetDialogFragment(), KoinComponent {
             }
             FirewallManager.FirewallStatus.EXCLUDE -> {
                 b.bsConnFirewallSpinner.setSelection(7, true)
-            }
-            else -> {
-                // no-op
             }
         }
     }
