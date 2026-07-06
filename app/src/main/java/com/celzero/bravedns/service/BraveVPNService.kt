@@ -682,7 +682,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
             }
 
             // if the app is new (ie unknown), refresh the db
-            if (appStatus.isUntracked() && uid != INVALID_UID) {
+            if (uid != INVALID_UID) {
                 io("addNewApp") { rdb.addNewApp(uid) }
                 if (newAppBlocked(uid)) {
                     logd("firewall($connId): new app blocked, $uid")
@@ -4728,8 +4728,8 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
     }
 
     override fun onProxiesStopped() {
-        // clear the proxy handshake times
-        logd("onProxiesStopped; clear the handshake times")
+        // no need to remove the dnses as tunnel will be taking care of removing all
+        logd("onProxiesStopped")
     }
 
     override fun onProxyAdded(pid: String?, handle: String): Unit = go2kt(proxyAddedDispatcher) {
@@ -4742,7 +4742,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
 
         if (!pid.contains(ID_WG_BASE, true) && !pid.contains(Backend.RpnWin, true)) {
             // only wireguard / rpn proxies are considered for overlay network
-            logd("onProxyAdded: no-op as it is not wireguard proxy, added $pid")
+            logd("onProxyAdded: no-op as it is not wg/rpn proxy, added $pid")
             Logger.vv(LOG_TAG_VPN, "onProxyAdded: execution time: ${elapsedRealtime() - startTime} ms (no-op)")
             return@go2kt
         }
@@ -4764,6 +4764,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
                 vpnAdapter?.handleOnWgAdded(pid)
                 return@io
             }
+            refreshOrPauseOrResumeOrReAddProxies()
         }
         Logger.vv(LOG_TAG_VPN, "onProxyAdded: execution time: ${elapsedRealtime() - startTime} ms, pid: $pid")
     }
@@ -4812,6 +4813,8 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
                 vpnAdapter?.handleOnWgAdded(pid)
                 return@io
             }
+            // pause/resume option is not handled here as firestack is taking care of maintaining
+            // the state of the proxies
         }
     }
 
@@ -6334,6 +6337,10 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
 
     suspend fun getRpnClientInfoById(id: String): Client? {
         return vpnAdapter?.getRpnClientInfoById(id)
+    }
+
+    suspend fun getWgClientInfoById(id: String): Client? {
+        return vpnAdapter?.getWgClientInfoById(id)
     }
 
     suspend fun reconnectRpnProxy(id: String): Boolean {
