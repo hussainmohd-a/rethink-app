@@ -695,9 +695,9 @@
                         android:padding="5dp"
                         android:fontFamily="monospace"
                         android:textColor="?attr/accentBad"
-                        android:text="Rethink may be blocked by firewall rules ⚠"
+                        android:text="@string/rethink_block_error_desc"
                         android:textSize="@dimen/small_font_subheading_text"
-                        android:visibility="visible" />
+                        android:visibility="gone" />
                 </RelativeLayout>
 
             </com.google.android.material.card.MaterialCardView>

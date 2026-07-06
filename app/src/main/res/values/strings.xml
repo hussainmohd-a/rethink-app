@@ -2347,6 +2347,7 @@
 
     <!-- ServerWgConfigDetailActivity live stats card -->
     <string name="lbl_last_handshake" translatable="false">Last Handshake</string>
+    <string name="lbl_last_open" translatable="false">Last Reconnect</string>
     <string name="lbl_errors" translatable="false">Errors</string>
     <string name="lbl_client_ipv4" translatable="false">Client Info</string>
     <string name="lbl_server_info" translatable="false">Server Info</string>
@@ -2523,5 +2524,7 @@
     <string name="bfdm_option_auto_desc" translatable="false">Automatically select DNS based on other settings</string>
 
     <string name="console_log_include_file_trace" translatable="false">Include file trace in logs</string>
+
+    <string name="rethink_block_error_desc" translatable="false">Rethink may be blocked by firewall rules ⚠</string>
 
 </resources>

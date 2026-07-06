@@ -465,7 +465,7 @@ object Utilities {
             val alwaysOn = Settings.Secure.getString(context.contentResolver, "always_on_vpn_app")
             context.packageName == alwaysOn
         } catch (e: Exception) { // Catches SecurityException and other Settings-related exceptions
-            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}", e)
+            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}")
             if (isAtleastQ()) {
                 vpnService?.isAlwaysOn == true
             } else {
@@ -481,7 +481,7 @@ object Utilities {
             val alwaysOn = Settings.Secure.getString(context.contentResolver, "always_on_vpn_app")
             !TextUtils.isEmpty(alwaysOn) && context.packageName != alwaysOn
         } catch (e: Exception) { // Catches SecurityException and other Settings-related exceptions
-            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}", e)
+            Logger.w(LOG_TAG_VPN, "err while retrieving Settings.Secure value ${e.message}")
             false
         }
     }
