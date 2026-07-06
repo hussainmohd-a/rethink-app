@@ -2609,6 +2609,20 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
+    suspend fun getWgClientInfoById(id: String): Client? {
+        if (!tunnel.isConnected) {
+            Logger.i(LOG_TAG_PROXY, "$TAG no tunnel, skip fetching wg client by id")
+            return null
+        }
+
+        return try {
+            tunnel.proxies.getProxy(id).client()
+        } catch (e: Exception) {
+            Logger.w(LOG_TAG_PROXY, "$TAG err get wg client info by id($id): ${e.message}")
+            null
+        }
+    }
+
     suspend fun testRpnProxy(): Boolean {
         if (!tunnel.isConnected) {
             Logger.i(LOG_TAG_PROXY, "$TAG no tunnel, skip test rpn proxy")
