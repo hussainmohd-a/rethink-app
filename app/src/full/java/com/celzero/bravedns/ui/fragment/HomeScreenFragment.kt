@@ -755,7 +755,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                 // so the card never goes stale for too long.
                 val nextDelay = elapsed.coerceIn(MIN_PROXY_POLL_DELAY_MS, MAX_PROXY_POLL_DELAY_MS)
                 Logger.v(LOG_TAG_UI, "$TAG proxy poll: check took ${elapsed}ms, next delay ${nextDelay}ms")
-                kotlinx.coroutines.delay(nextDelay)
+                kotlinx.coroutines.delay(nextDelay.milliseconds)
             }
             proxyStateListenerJob?.cancel()
         }
@@ -1310,7 +1310,6 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
             io {
                 try {
                     val copy: Collection<AppInfo>
-                    // replace synchronized block to mutex
                     appRulesMutex.withLock {
                         copy = mutableListOf<AppInfo>().apply { addAll(it) }.toList()
                     }
@@ -1890,48 +1889,45 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
     }
 
     private suspend fun shouldShowRethinkWarning(): Boolean {
+        val tag = "rethink_app_status"
         // show the warning in below cases:
-        // 1. Rethink is not excluded from proxy, and proxy enabled
-        // 2. Rethink is excluded from proxy, and proxy lockdown is enabled
-        // 3. Rethink is either blocked/isolated
-        // 4. Rethink is not bypassed(Universal), and universal firewall enabled
-        // 5. Rethink is not bypassed(Universal)
+        // 1. Rethink is excluded from proxy, and proxy lockdown is enabled (loopback mode)
+        // 2. Rethink is either blocked/isolated
+        // 3. Rethink is not bypassed(Universal), and universal firewall enabled
 
-        /*val loopback = persistentState.routeRethinkInRethink
+        val loopback = persistentState.routeRethinkInRethink
         if (!loopback) {
-            Logger.d(LOG_TAG_UI, "rethink is in loopback mode")
+            Logger.d(LOG_TAG_UI, "$tag not in loopback mode")
             return false
-        }*/
+        }
 
         val appInfo = FirewallManager.getAppInfoByUid(rethinkUid) ?: return false
 
         val isProxyExcluded = appInfo.isProxyExcluded
         val isProxyLockdown = persistentState.wgGlobalLockdown
-        val isAnyProxyActive = appConfig.isProxyEnabled() || RpnProxyManager.isRpnActive()
+        // TODO: check if rethink is part of any active proxies, if not then we need to show
+        // the warning (in case of Proxy lockdown) regardless of proxyExcluded.
+        // val isAnyProxyActive = appConfig.isProxyEnabled() || RpnProxyManager.isRpnActive()
         if (isProxyExcluded && isProxyLockdown) {
-            Logger.d(LOG_TAG_UI, "rethink is exempted from proxy but in proxy lockdown mode")
-            return true
-        }
-        if (!isProxyExcluded && isAnyProxyActive) {
-            Logger.d(LOG_TAG_UI, "rethink is not exempted from proxy but proxy is active, conns will be frwded to proxy")
+            Logger.d(LOG_TAG_UI, "$tag rethink is exempted from proxy but in proxy lockdown mode")
             return true
         }
         val firewallStatus = FirewallManager.FirewallStatus.getStatus(appInfo.firewallStatus)
         val connStatus = FirewallManager.ConnectionStatus.getStatus(appInfo.connectionStatus)
         val isRethinkBlockedOrIsolated = firewallStatus.isIsolate() || !connStatus.allow()
         if (isRethinkBlockedOrIsolated) {
-            Logger.d(LOG_TAG_UI, "rethink is blocked or isolated")
+            Logger.d(LOG_TAG_UI, "$tag rethink is blocked or isolated")
             return true
         }
-        val isAppBypass = firewallStatus.bypassDnsFirewall() || firewallStatus.bypassUniversal()
+        val isAppBypass = firewallStatus.bypassUniversal() || firewallStatus.bypassDnsFirewall()
         val count =  persistentState.universalRulesCount.value
         val isAnyUnivRulesEnabled = count != null && count > 0
         if (!isAppBypass && isAnyUnivRulesEnabled) {
-            Logger.d(LOG_TAG_UI, "rethink is not bypassed, and universal firewall is enabled")
+            Logger.d(LOG_TAG_UI, "$tag rethink is not bypassed, and universal firewall is enabled")
             return true
         }
 
-        Logger.vv(LOG_TAG_UI, "rethink app, no warning needed, proxyExcluded? $isProxyExcluded, proxyLockdown? $isProxyLockdown, isAnyProxyActive? $isAnyProxyActive, isRethinkBlockedOrIsolated? $isRethinkBlockedOrIsolated, isAppBypass? $isAppBypass, isAnyUnivRulesEnabled? $isAnyUnivRulesEnabled")
+        Logger.d(LOG_TAG_UI, "$tag rethink app, no warning needed, proxyExcluded? $isProxyExcluded, proxyLockdown? $isProxyLockdown, isAppBypass? $isAppBypass, isAnyUnivRulesEnabled? $isAnyUnivRulesEnabled")
         return false
     }
 
