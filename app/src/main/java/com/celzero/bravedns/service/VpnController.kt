@@ -53,15 +53,14 @@ import java.net.Socket
 object VpnController : KoinComponent {
 
     @Volatile private var braveVpnService: BraveVPNService? = null
-    @Volatile private var connectionState: BraveVPNService.State? = null
+    private var connectionState: BraveVPNService.State? = null
     private val persistentState by inject<PersistentState>()
-    @Volatile private var states: Channel<BraveVPNService.State?>? = null
+    private var states: Channel<BraveVPNService.State?>? = null
     @Volatile private var protocol: Pair<Boolean, Boolean> = Pair(false, false)
     private const val URL4 = "IPv4"
     private const val URL6 = "IPv6"
 
     // usually same as vpnScope from BraveVPNService
-    @Volatile
     var externalScope: CoroutineScope? = null
         private set
 
@@ -491,6 +490,10 @@ object VpnController : KoinComponent {
 
     suspend fun getRpnClientInfoById(id: String): Client? {
         return braveVpnService?.getRpnClientInfoById(id)
+    }
+
+    suspend fun getWgClientInfoById(id: String): Client? {
+        return braveVpnService?.getWgClientInfoById(id)
     }
 
     suspend fun vpnStats(): String? {
