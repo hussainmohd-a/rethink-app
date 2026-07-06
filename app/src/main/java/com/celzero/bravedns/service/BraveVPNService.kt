@@ -4210,7 +4210,18 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
                 // there maybe multiple transports when split dns is enabled, so add the already
                 // used transport id as secondary transport id
                 logd("getTransportIdToBypass: global, returning preferred with prev ids as secondary $secTransport")
-                return Pair(Backend.Preferred, secTransport)
+                val defaultTid =
+                    if (appConfig.isSystemDns() || (isAppPaused() && isLockdown())) {
+                        // in vpn-lockdown mode+appPause , use system dns if the app is paused to mimic
+                        // as if the apps are excluded from vpn
+                        Backend.System
+                    } else if (appConfig.isSmartDnsEnabled()) {
+                        // if smart dns is enabled, use plus transport id
+                        Backend.Plus
+                    } else {
+                        Backend.Preferred
+                    }
+                return Pair(defaultTid, secTransport)
             }
 
             BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.FALLBACK -> {
