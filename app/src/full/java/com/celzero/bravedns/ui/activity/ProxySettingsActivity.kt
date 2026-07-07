@@ -594,7 +594,7 @@ class ProxySettingsActivity : BaseActivity(R.layout.fragment_proxy_configure) {
         }
     }
 
-    private fun isDnsError(statusId: Long?): Boolean {
+    private fun isDnsError(statusId: Int?): Boolean {
         if (statusId == null) return true
 
         val s = Transaction.Status.fromId(statusId)
@@ -607,7 +607,7 @@ class ProxySettingsActivity : BaseActivity(R.layout.fragment_proxy_configure) {
             s == Transaction.Status.TRANSPORT_ERROR
     }
 
-    private fun getProxyStatusText(statusPair: Pair<Long?, String>, stats: RouterStats?): String {
+    private fun getProxyStatusText(statusPair: Pair<Int?, String>, stats: RouterStats?): String {
         val status = UIUtils.ProxyStatus.entries.find { it.id == statusPair.first }
 
         return getStatusText(status, stats, statusPair.second)

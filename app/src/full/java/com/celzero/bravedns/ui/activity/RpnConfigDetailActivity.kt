@@ -548,7 +548,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
      *   (supplied by [RpnProxyManager.getSelectedSinceTs]); shown as the "active since" value.
      */
     private fun applyStats(
-        statusPair: Pair<Long?, String>,
+        statusPair: Pair<Int?, String>,
         stats: RouterStats?,
         config: CountryConfig?,
         selectedSinceTs: Long

@@ -1138,7 +1138,7 @@ object WireguardManager : KoinComponent {
         }
     }
 
-    data class WgStats(val routerStats: RouterStats?, val mtu: Long?, val status: Long?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?, val clientV6: IPMetadata?)
+    data class WgStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?, val clientV6: IPMetadata?)
     suspend fun stats(): String {
         val sb = StringBuilder()
         mappings.filter { it.isActive }.forEach {

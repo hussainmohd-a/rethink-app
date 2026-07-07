@@ -354,7 +354,7 @@ class WgConfigAdapter(private val context: Context, private val listener: DnsSta
             }
         }
 
-        private fun updateStatusUi(config: WgConfigFiles, statusPair: Pair<Long?, String>, dnsStatusId: Long?, stats: RouterStats?) {
+        private fun updateStatusUi(config: WgConfigFiles, statusPair: Pair<Int?, String>, dnsStatusId: Int?, stats: RouterStats?) {
             if (config.isActive) {
                 b.interfaceSwitch.isChecked = true
                 b.interfaceDetailCard.strokeWidth = 2
@@ -469,7 +469,7 @@ class WgConfigAdapter(private val context: Context, private val listener: DnsSta
             }
         }
 
-        private fun updateProxyStatusUi(statusPair: Pair<Long?, String>, stats: RouterStats?) {
+        private fun updateProxyStatusUi(statusPair: Pair<Int?, String>, stats: RouterStats?) {
             val status = UIUtils.ProxyStatus.entries.find { it.id == statusPair.first } // Convert to enum
 
             val humanReadableLastOk = getHumanReadableLastOk(stats).toString()
@@ -482,7 +482,7 @@ class WgConfigAdapter(private val context: Context, private val listener: DnsSta
             Logger.d(LOG_TAG_UI, "$TAG status updated to $statusText (${status?.id} - ${status?.name}) with stroke color $strokeColor, lastok:${stats?.lastOK}, since:${stats?.since}, humanReadableLastOk:$humanReadableLastOk")
         }
 
-        private fun isDnsError(statusId: Long?): Boolean {
+        private fun isDnsError(statusId: Int?): Boolean {
             if (statusId == null) return true
 
             val s = Transaction.Status.fromId(statusId)

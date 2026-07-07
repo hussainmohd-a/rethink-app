@@ -68,7 +68,7 @@ import java.util.regex.Pattern
 
 object UIUtils {
 
-    fun getDnsStatusStringRes(status: Long?): Int {
+    fun getDnsStatusStringRes(status: Int?): Int {
         if (status == null) return R.string.failed_using_default
 
         return when (Transaction.Status.fromId(status)) {
@@ -102,7 +102,7 @@ object UIUtils {
         }
     }
 
-    fun getProxyStatusStringRes(statusId: Long?): Int {
+    fun getProxyStatusStringRes(statusId: Int?): Int {
         return when (statusId) {
             Backend.TUP -> {
                 R.string.lbl_starting
@@ -131,7 +131,7 @@ object UIUtils {
         }
     }
 
-    enum class ProxyStatus(val id: Long) {
+    enum class ProxyStatus(val id: Int) {
         TOK(Backend.TOK),
         TUP(Backend.TUP),
         TZZ(Backend.TZZ),

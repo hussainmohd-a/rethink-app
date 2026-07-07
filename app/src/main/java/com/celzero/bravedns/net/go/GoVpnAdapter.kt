@@ -1045,7 +1045,7 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
-    suspend fun hopStatus(src: String, hop: String): Pair<Long?, String> {
+    suspend fun hopStatus(src: String, hop: String): Pair<Int?, String> {
         return try {
             val status = tunnel.proxies.getProxy(src).router().via().status()
             Logger.v(LOG_TAG_VPN, "$TAG hop $src -> $hop; status: $status")
@@ -1170,7 +1170,7 @@ class GoVpnAdapter : KoinComponent {
         Logger.i(LOG_TAG_VPN, "$TAG Socks5 mode set: " + socks5.proxyIP + "," + socks5.proxyPort)
     }
 
-    suspend fun getProxyStatusById(id: String): Pair<Long?, String> {
+    suspend fun getProxyStatusById(id: String): Pair<Int?, String> {
         return try {
             if (id == Backend.RpnWin) {
                 val status = tunnel.proxies.rpn().win().status()
@@ -1693,7 +1693,7 @@ class GoVpnAdapter : KoinComponent {
         }
     }
 
-    suspend fun getDnsStatus(id: String): Long? {
+    suspend fun getDnsStatus(id: String): Int? {
         try {
             if (id == Backend.RpnWin) {
                 val status = tunnel.proxies.rpn().win().status()

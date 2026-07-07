@@ -866,7 +866,7 @@ object RpnProxyManager : KoinComponent {
         }
     }
 
-    data class RpnProps(val id: String, val status: Long, val type: String, val addr: String, val created: Long, val expires: Long, val who: String, val locations: RpnServers) {
+    data class RpnProps(val id: String, val status: Int, val type: String, val addr: String, val created: Long, val expires: Long, val who: String, val locations: RpnServers) {
         override fun toString(): String {
             val cts = getTime(created)
             val ets = getTime(expires)
@@ -3001,7 +3001,7 @@ object RpnProxyManager : KoinComponent {
         }
     }
 
-    data class RpnStats(val routerStats: RouterStats?, val mtu: Long?, val status: Long?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?)
+    data class RpnStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?)
     suspend fun stats(): String {
         val sb = StringBuilder()
         sb.append("   Rpn active: ${isRpnActive()}\n\n")

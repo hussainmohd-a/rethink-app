@@ -520,7 +520,7 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
         return sb
     }
 
-    private fun isDnsError(statusId: Long?): Boolean {
+    private fun isDnsError(statusId: Int?): Boolean {
         if (statusId == null) return true
 
         val s = Transaction.Status.fromId(statusId)
