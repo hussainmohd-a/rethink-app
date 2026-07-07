@@ -266,6 +266,15 @@ class DnsLogAdapter(val context: Context, val loadFavIcon: Boolean, val isRethin
                 }
             }
 
+            if (log.isEch) {
+                b.dnsUnicodeHint.text =
+                    context.getString(
+                        R.string.ci_desc,
+                        b.dnsUnicodeHint.text,
+                        context.getString(R.string.symbol_seal)
+                    )
+            }
+
             if (b.dnsUnicodeHint.text.isEmpty() && b.dnsQueryType.text.isEmpty() && b.dnsLatency.text.isEmpty()) {
                 b.dnsSummaryLl.visibility = View.GONE
             } else {
