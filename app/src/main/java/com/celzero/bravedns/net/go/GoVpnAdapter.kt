@@ -1172,17 +1172,30 @@ class GoVpnAdapter : KoinComponent {
 
     suspend fun getProxyStatusById(id: String): Pair<Int?, String> {
         return try {
-            if (id == Backend.RpnWin) {
-                val status = tunnel.proxies.rpn().win().status()
-                Logger.d(LOG_TAG_VPN, "$TAG rpn-win status: $status")
-                return Pair(status, "")
+            if (id == Backend.RpnWin || id.startsWith(Backend.RpnWin)) {
+                val status = getRpnStatusById(id)
+                Logger.d(LOG_TAG_VPN, "$TAG rpn-win status($id): $status")
+                status
+            } else {
+                val status = getProxies()?.getProxy(id)?.status()
+                Logger.d(LOG_TAG_VPN, "$TAG proxy status($id): $status")
+                Pair(status, "")
             }
-            val status = getProxies()?.getProxy(id)?.status()
-            Logger.d(LOG_TAG_VPN, "$TAG proxy status($id): $status")
-            Pair(status, "")
         } catch (ex: Exception) {
             Logger.i(LOG_TAG_VPN, "$TAG err getProxy($id), reason: ${ex.message}")
             Pair(null, ex.message.orEmpty())
+        }
+    }
+
+    private suspend fun getRpnStatusById(id: String): Pair<Int?, String> {
+        return try {
+            val win = getWinByKey(id)
+            val status = win?.status()
+            Logger.d(LOG_TAG_VPN, "$TAG rpn-win status: $status")
+            return Pair(status, "")
+        } catch (e: Exception) {
+            Logger.i(LOG_TAG_VPN, "$TAG err getRpn($id), reason: ${e.message}")
+            Pair(null, e.message.orEmpty())
         }
     }
 
@@ -1564,8 +1577,8 @@ class GoVpnAdapter : KoinComponent {
     suspend fun getProxyStats(id: String): RouterStats? {
         return try {
             if (id == Backend.RpnWin || id.startsWith(Backend.RpnWin)) {
-                val key = getWinByKey(id)
-                val stats = key?.router()?.stat()
+                val win = getWinByKey(id)
+                val stats = win?.router()?.stat()
                 Logger.d(LOG_TAG_VPN, "$TAG rpn-win proxy status: $stats")
                 stats
             } else {
