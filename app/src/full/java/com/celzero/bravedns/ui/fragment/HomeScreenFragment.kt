@@ -994,7 +994,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         return persistentState.splitDns
     }
 
-    private fun isDnsError(statusId: Long?): Boolean {
+    private fun isDnsError(statusId: Int?): Boolean {
         if (statusId == null) return true
 
         val s = Transaction.Status.fromId(statusId)

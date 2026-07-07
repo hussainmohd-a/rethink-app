@@ -506,7 +506,7 @@ class VpnServerAdapter(
 
         private fun applyStats(
             config: CountryConfig?,
-            statusPair: Pair<Long?, String>,
+            statusPair: Pair<Int?, String>,
             stats: RouterStats?,
             ip4: IPMetadata? = null
         ) {

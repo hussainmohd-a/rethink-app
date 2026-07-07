@@ -250,7 +250,7 @@ object VpnController : KoinComponent {
         braveVpnService?.decreasePauseDuration(durationMs)
     }
 
-    suspend fun getProxyStatusById(id: String): Pair<Long?, String> {
+    suspend fun getProxyStatusById(id: String): Pair<Int?, String> {
         return braveVpnService?.getProxyStatusById(id) ?: Pair(null, "vpn service not available")
     }
 
@@ -371,7 +371,7 @@ object VpnController : KoinComponent {
         braveVpnService?.closeConnectionsByUidDomain(uid, ipAddress, reason)
     }
 
-    suspend fun getDnsStatus(id: String): Long? {
+    suspend fun getDnsStatus(id: String): Int? {
         return braveVpnService?.getDnsStatus(id)
     }
 
@@ -448,7 +448,7 @@ object VpnController : KoinComponent {
         return braveVpnService?.testHop(src, hop) ?: Pair(false, "vpn service not available")
     }
 
-    suspend fun hopStatus(src: String, hop: String): Pair<Long?, String> {
+    suspend fun hopStatus(src: String, hop: String): Pair<Int?, String> {
         return braveVpnService?.hopStatus(src, hop) ?: Pair(null, "vpn service not available")
     }
 

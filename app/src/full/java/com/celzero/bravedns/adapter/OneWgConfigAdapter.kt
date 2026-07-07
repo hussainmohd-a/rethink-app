@@ -213,14 +213,14 @@ class OneWgConfigAdapter(private val context: Context, private val listener: Dns
             }
         }
 
-        private fun isDnsError(statusId: Long?): Boolean {
+        private fun isDnsError(statusId: Int?): Boolean {
             if (statusId == null) return true
 
             val s = Transaction.Status.fromId(statusId)
             return s == Transaction.Status.BAD_QUERY || s == Transaction.Status.BAD_RESPONSE || s == Transaction.Status.NO_RESPONSE || s == Transaction.Status.SEND_FAIL || s == Transaction.Status.CLIENT_ERROR || s == Transaction.Status.INTERNAL_ERROR || s == Transaction.Status.TRANSPORT_ERROR
         }
 
-        private fun updateStatusUi(config: WgConfigFiles, statusPair: Pair<Long?, String>, dnsStatusId: Long?, stats: RouterStats?) {
+        private fun updateStatusUi(config: WgConfigFiles, statusPair: Pair<Int?, String>, dnsStatusId: Int?, stats: RouterStats?) {
             if (config.isActive && VpnController.hasTunnel()) {
                 b.interfaceDetailCard.strokeWidth = 2
                 b.oneWgCheck.isChecked = true
@@ -307,7 +307,7 @@ class OneWgConfigAdapter(private val context: Context, private val listener: Dns
             }
         }
 
-        private fun updateProxyStatusUi(statusPair: Pair<Long?, String>, stats: RouterStats?) {
+        private fun updateProxyStatusUi(statusPair: Pair<Int?, String>, stats: RouterStats?) {
             val status =
                 UIUtils.ProxyStatus.entries.find { it.id == statusPair.first } // Convert to enum
 

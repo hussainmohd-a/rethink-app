@@ -4769,11 +4769,9 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
             if (pid.contains(Backend.RpnWin, true) && RpnProxyManager.isRpnActive()) {
                 logd("onProxyAdded: rpn proxy added $pid, handle post addition logics")
                 vpnAdapter?.handleOnRpnAddedOrUpdated(pid)
-                return@io
             } else if (pid.contains(ID_WG_BASE, true)) {
                 logd("onProxyAdded: wg proxy added $pid, handle post addition logics")
                 vpnAdapter?.handleOnWgAdded(pid)
-                return@io
             }
             refreshOrPauseOrResumeOrReAddProxies()
         }
@@ -5921,7 +5919,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         }
     }
 
-    suspend fun getDnsStatus(id: String): Long? {
+    suspend fun getDnsStatus(id: String): Int? {
         return vpnAdapter?.getDnsStatus(id)
     }
 
@@ -6124,7 +6122,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         )
     }
 
-    suspend fun getProxyStatusById(id: String): Pair<Long?, String> {
+    suspend fun getProxyStatusById(id: String): Pair<Int?, String> {
         return vpnAdapter?.getProxyStatusById(id) ?: Pair(null, "adapter is null")
     }
 
@@ -6229,7 +6227,7 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
         return vpnAdapter?.testHop(src, hop) ?: Pair(false, "vpn not active")
     }
 
-    suspend fun hopStatus(src: String, via: String): Pair<Long?, String> {
+    suspend fun hopStatus(src: String, via: String): Pair<Int?, String> {
         return vpnAdapter?.hopStatus(src, via) ?: Pair(null, "vpn not active")
     }
 
