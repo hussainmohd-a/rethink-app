@@ -4816,11 +4816,9 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Bridge,
             if (pid.contains(Backend.RpnWin, true) && RpnProxyManager.isRpnActive()) {
                 logd("onProxyUpdated: rpn proxy added $pid, handle post addition logics")
                 vpnAdapter?.handleOnRpnAddedOrUpdated(pid)
-                return@io
             } else if (pid.contains(ID_WG_BASE, true)) {
                 logd("onProxyUpdated: wg proxy added $pid, handle post addition logics")
                 vpnAdapter?.handleOnWgAdded(pid)
-                return@io
             }
             // pause/resume option is not handled here as firestack is taking care of maintaining
             // the state of the proxies
