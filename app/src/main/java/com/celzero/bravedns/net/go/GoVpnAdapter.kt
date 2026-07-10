@@ -1602,8 +1602,9 @@ class GoVpnAdapter : KoinComponent {
             val mtu = router?.mtu()
             val ip4 = router?.iP4()
             val ip6 = router?.iP6()
+            val addr = proxy?.addr
 
-            WireguardManager.WgStats(stat, mtu, status, ip4, ip6, null, null)
+            WireguardManager.WgStats(stat, mtu, status, ip4, ip6, addr)
         } catch (_: java.util.concurrent.TimeoutException) {
             Logger.w(LOG_TAG_VPN, "$TAG timeout getting wg stats($id)")
             null
@@ -1623,10 +1624,9 @@ class GoVpnAdapter : KoinComponent {
             val mtu = router?.mtu()
             val ip4 = router?.iP4()
             val ip6 = router?.iP6()
-            val client = runCatching { rpn?.client() }.getOrNull()
-            val clientV4 = runCatching { client?.iP4() }.getOrNull()
+            val addr = rpn?.addr
 
-            RpnProxyManager.RpnStats(stat, mtu, status, ip4, ip6, clientV4)
+            RpnProxyManager.RpnStats(stat, mtu, status, ip4, ip6, addr)
         } catch (e: Exception) {
             Logger.w(LOG_TAG_VPN, "$TAG err getting rpn stats($id): ${e.message}")
             null
@@ -2512,7 +2512,7 @@ class GoVpnAdapter : KoinComponent {
     suspend fun undelegatedDomains(useSystemDns: Boolean = persistentState.useSystemDnsForUndelegatedDomains) {
         if (!tunnel.isConnected) {
             Logger.e(LOG_TAG_VPN, "$TAG no tunnel, skip undelegated domains")
-            logEvent(Severity.CRITICAL, "undeletegated domains", "cannot set undelegated domains, tunnel not connected")
+            logEvent(Severity.CRITICAL, "undeletegated domains", "cannot set undelegated domains to use system dns, tunnel not connected")
             return
         }
         try {
@@ -2521,7 +2521,7 @@ class GoVpnAdapter : KoinComponent {
             logEvent(Severity.LOW, "undelegated domains", "set undelegated domains to use system dns: $useSystemDns")
         } catch (e: Exception) {
             Logger.e(LOG_TAG_VPN, "$TAG err undelegated domains: ${e.message}", e)
-            logEvent(Severity.HIGH, "undelegated domains", "error setting undelegated domains: ${e.message}")
+            logEvent(Severity.HIGH, "undelegated domains", "error setting undelegated domains to use system dns: ${e.message}")
         }
     }
 

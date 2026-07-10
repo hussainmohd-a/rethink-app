@@ -119,9 +119,8 @@ object RpnProxyManager : KoinComponent {
         val selectedAt: Long
     )
 
-    // Tracks per-server-key metadata (selection time, last tunnel-start ts, cached client IPs).
-    // Populated from CountryConfig.lastModified on startup; overwritten on every runtime
-    // enable/disable; sinceTs / ip[46]Meta updated by RpnConfigDetailActivity after each poll.
+    // Tracks per-server-key metadata (selection time).
+    // overwritten on every runtime enable/disable
     private val serverKeyMeta = ConcurrentHashMap<String, ServerKeyMeta>()
 
     private val subscriptionStateMachine: SubscriptionStateMachineV2 by inject()
@@ -1642,15 +1641,16 @@ object RpnProxyManager : KoinComponent {
     }
 
     /**
-     * Records the epoch-ms timestamp at which [key] was last added to the VPN tunnel.
+     * Records the epoch-ms timestamp at which [key] was first added to the VPN tunnel.
      *
-     * Must be called immediately after every successful [VpnController.addNewWinServer] call,
-     * regardless of whether it is the user explicitly enabling a server ([enableWinServer]),
-     * the tunnel being re-established on a phone reboot / VPN reconnect
-     * ([BraveVPNService.handleRpnProxies]), or a periodic refresh ([updateWinProxy]).
+     * If a timestamp already exists for [key] it is preserved — the timestamp tracks
+     * when the server was originally enabled, not when the tunnel was re-established.
+     * Timestamps are cleared only when the VPN is fully stopped and restarted
+     * (via [deactivateRpn] which calls [serverKeyMeta.clear]).
      */
     fun notifyServerAddedToTun(key: String) {
         if (key.isEmpty()) return
+        if (serverKeyMeta.containsKey(key)) return
         val now = System.currentTimeMillis()
         serverKeyMeta[key] = ServerKeyMeta(selectedAt = now)
         if (DEBUG) Logger.d(LOG_TAG_PROXY, "$TAG; notifyServerAddedToTun: key=$key, ts=$now")
@@ -1771,9 +1771,6 @@ object RpnProxyManager : KoinComponent {
             try {
                 val result = VpnController.addNewWinServer(config.key)
                 if (result.first) {
-                    // Update the in-memory timestamp so uptime display shows the last
-                    // time this server was (re-)added to the tunnel.
-                    notifyServerAddedToTun(config.key)
                     Logger.i(LOG_TAG_PROXY, "$TAG; updateWinProxy: re-added server key=${config.key}")
                 } else {
                     Logger.w(LOG_TAG_PROXY, "$TAG; updateWinProxy: failed to re-add server key=${config.key}: ${result.second}")
@@ -3001,7 +2998,7 @@ object RpnProxyManager : KoinComponent {
         }
     }
 
-    data class RpnStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?)
+    data class RpnStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val addr: String?)
     suspend fun stats(): String {
         val sb = StringBuilder()
         sb.append("   Rpn active: ${isRpnActive()}\n\n")
@@ -3018,7 +3015,7 @@ object RpnProxyManager : KoinComponent {
             val stats = VpnController.getRpnStats(id)
             val routerStats = stats?.routerStats
             sb.append("   id: ${it.id}, name: ${it.name}\n")
-            sb.append("   addr: ${routerStats?.addrs}").append("\n")
+            sb.append("   ifaddr: ${routerStats?.addrs}").append("\n")
             sb.append("   mtu: ${stats?.mtu}\n")
             sb.append("   status: ${routerStats?.status}\n")
             sb.append("   statusReason: ${routerStats?.statusReason}\n")
@@ -3036,10 +3033,10 @@ object RpnProxyManager : KoinComponent {
             sb.append("   lastOpen: ${getRelativeTimeSpan(routerStats?.lastOpen)}\n")
             sb.append("   hdl: ${routerStats?.hdl}\n")
             sb.append("   since: ${getRelativeTimeSpan(routerStats?.since)}\n")
+            sb.append("   addr: ${stats?.addr ?: "N/A"}")
             sb.append("   errRx: ${routerStats?.errRx}\n")
             sb.append("   errTx: ${routerStats?.errTx}\n")
-            sb.append("   extra: ${routerStats?.extra}\n")
-            sb.append("   client4: ${stats?.clientV4}\n\n")
+            sb.append("   extra: ${routerStats?.extra}\n\n")
             val s = sb.toString()
             Logger.d(LOG_TAG_PROXY, "$TAG; id: $id stats:\n$s")
         }

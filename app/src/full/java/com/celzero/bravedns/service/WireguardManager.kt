@@ -1138,7 +1138,7 @@ object WireguardManager : KoinComponent {
         }
     }
 
-    data class WgStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val clientV4: IPMetadata?, val clientV6: IPMetadata?)
+    data class WgStats(val routerStats: RouterStats?, val mtu: Long?, val status: Int?, val ip4: Boolean?, val ip6: Boolean?, val addr: String?)
     suspend fun stats(): String {
         val sb = StringBuilder()
         mappings.filter { it.isActive }.forEach {
@@ -1164,11 +1164,10 @@ object WireguardManager : KoinComponent {
             sb.append("   lastOpen: ${getRelativeTimeSpan(routerStats?.lastOpen)}\n")
             sb.append("   hdl: ${routerStats?.hdl}\n")
             sb.append("   since: ${getRelativeTimeSpan(routerStats?.since)}\n")
+            sb.append("   addr: ${stats?.addr ?: "N/A"}")
             sb.append("   errRx: ${routerStats?.errRx}\n")
             sb.append("   errTx: ${routerStats?.errTx}\n")
-            sb.append("   extra: ${routerStats?.extra}\n")
-            sb.append("   clientV4: ${stats?.clientV4?.toString()}\n")
-            sb.append("   clientV6: ${stats?.clientV6?.toString()}\n\n")
+            sb.append("   extra: ${routerStats?.extra}\n\n")
         }
         if (sb.isEmpty()) {
             sb.append("   N/A\n\n")
