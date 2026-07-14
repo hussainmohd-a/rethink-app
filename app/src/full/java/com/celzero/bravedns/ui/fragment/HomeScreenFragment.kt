@@ -1065,7 +1065,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         // The latency check is a one-shot IO call that refreshes the displayed latency every time
         // this function is called (e.g. on each brave-mode observer or onResume() cycle).
         io {
-            val dnsId = if (WireguardManager.oneWireGuardEnabled()) {
+            var dnsId = if (WireguardManager.oneWireGuardEnabled()) {
                 val id = WireguardManager.getOneWireGuardProxyId()
                 if (id == null) {
                     if (appConfig.isSmartDnsEnabled()) {
@@ -1082,6 +1082,9 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                 } else {
                     Backend.Preferred
                 }
+            }
+            if (persistentState.enableDnsCache) {
+                dnsId = Backend.CT + dnsId
             }
             val p50 = VpnController.p50(dnsId)
             uiCtx {
