@@ -89,12 +89,12 @@ class WgIncludeAppsAdapter(
     }
 
     override fun onBindViewHolder(holder: IncludedAppInfoViewHolder, position: Int) {
-        val apps: ProxyApplicationMapping = getItem(position) ?: return
-        // Double-check position validity to prevent IndexOutOfBoundsException
-        if (position !in 0..<itemCount) {
+        // Guard against stale positions during layout pass after data change
+        if (position < 0 || position >= itemCount) {
             Logger.w(LOG_TAG_PROXY, "Invalid position $position for itemCount $itemCount")
             return
         }
+        val apps: ProxyApplicationMapping = getItem(position) ?: return
         holder.update(apps)
     }
 
@@ -243,7 +243,7 @@ class WgIncludeAppsAdapter(
                     removeProxyFromApp(mapping.uid, mapping.packageName, proxyId)
                     Logger.i(LOG_TAG_PROXY, "Removed app: ${mapping.uid}, $proxyId, $proxyName")
                 }
-                refresh()
+                uiCtx { refresh() }
             }
         }
 
@@ -298,7 +298,7 @@ class WgIncludeAppsAdapter(
                                 }
                             }
                         }
-                        refresh()
+                        uiCtx { refresh() }
                     }
                 }
                 .setNeutralButton(context.getString(R.string.ctbs_dialog_negative_btn)) { _: DialogInterface, _: Int ->
