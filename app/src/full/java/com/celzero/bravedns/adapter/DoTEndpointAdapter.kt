@@ -21,6 +21,7 @@ import Logger.LOG_TAG_DNS
 import android.content.Context
 import android.content.DialogInterface
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -117,8 +118,10 @@ class DoTEndpointAdapter(private val context: Context, private val appConfig: Ap
                 keepSelectedStatusUpdated()
             } else if (endpoint.isSelected) {
                 b.endpointDesc.text = context.getString(R.string.rt_filter_parent_selected)
+                b.endpointDesc.visibility = View.VISIBLE
             } else {
                 b.endpointDesc.text = ""
+                b.endpointDesc.visibility = View.GONE
             }
 
             // Shows either the info/delete icon for the DoH entries.
@@ -156,6 +159,7 @@ class DoTEndpointAdapter(private val context: Context, private val appConfig: Ap
                 val status = getDnsStatusStringRes(state)
                 uiCtx {
                     b.endpointDesc.text = context.getString(status).replaceFirstChar(Char::titlecase)
+                    b.endpointDesc.visibility = View.VISIBLE
                 }
             }
         }

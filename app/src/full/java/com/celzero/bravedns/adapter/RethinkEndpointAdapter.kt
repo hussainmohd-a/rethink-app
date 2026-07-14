@@ -22,6 +22,7 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -122,8 +123,10 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
             } else if (endpoint.isActive) {
                 b.rethinkEndpointListUrlExplanation.text =
                     context.getString(R.string.rt_filter_parent_selected)
+                b.rethinkEndpointListUrlExplanation.visibility = View.VISIBLE
             } else {
                 b.rethinkEndpointListUrlExplanation.text = ""
+                b.rethinkEndpointListUrlExplanation.visibility = View.GONE
             }
         }
 
@@ -156,10 +159,10 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
             val state = VpnController.getDnsStatus(Backend.Preferred)
             val status = UIUtils.getDnsStatusStringRes(state)
             uiCtx {
-                // show the status as it is if it is not connected
                 if (status != R.string.dns_connected) {
                     b.rethinkEndpointListUrlExplanation.text =
                         context.getString(status).replaceFirstChar(Char::titlecase)
+                    b.rethinkEndpointListUrlExplanation.visibility = View.VISIBLE
                     return@uiCtx
                 }
 
@@ -172,6 +175,7 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
                 } else {
                     b.rethinkEndpointListUrlExplanation.text = context.getString(status)
                 }
+                b.rethinkEndpointListUrlExplanation.visibility = View.VISIBLE
             }
 
         }

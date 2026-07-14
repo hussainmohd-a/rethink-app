@@ -19,6 +19,7 @@ package com.celzero.bravedns.adapter
 import android.content.Context
 import android.content.DialogInterface
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
@@ -118,6 +119,7 @@ class DnsCryptRelayEndpointAdapter(
                 updateSelectedStatus()
             } else {
                 b.dnsCryptEndpointListUrlExplanation.text = ""
+                b.dnsCryptEndpointListUrlExplanation.visibility = View.GONE
             }
 
             b.dnsCryptEndpointListActionImage.isChecked = endpoint.isSelected
@@ -140,6 +142,7 @@ class DnsCryptRelayEndpointAdapter(
                 uiCtx {
                     b.dnsCryptEndpointListUrlExplanation.text =
                         context.getString(status).replaceFirstChar(Char::titlecase)
+                    b.dnsCryptEndpointListUrlExplanation.visibility = View.VISIBLE
                 }
             }
         }
