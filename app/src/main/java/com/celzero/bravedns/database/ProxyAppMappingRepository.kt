@@ -56,6 +56,10 @@ class ProxyAppMappingRepository(
     }
 
     suspend fun updateUidForApp(oldUid: Int, newUid: Int, packageName: String) {
+        if (oldUid == newUid) {
+            Logger.w(LOG_TAG_PROXY, "updateUidForApp: oldUid == newUid ($oldUid) for $packageName; skipping")
+            return
+        }
         try {
             proxyApplicationMappingDAO.updateUidForApp(oldUid, newUid, packageName)
         } catch (_: SQLiteConstraintException) {
