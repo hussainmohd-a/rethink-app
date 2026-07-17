@@ -142,21 +142,30 @@ object UIUtils {
     }
 
     fun formatToRelativeTime(context: Context, timestamp: Long): String {
-        val now = System.currentTimeMillis()
         return if (DateUtils.isToday(timestamp)) {
             context.getString(R.string.relative_time_today)
         } else if (isYesterday(Date(timestamp))) {
             context.getString(R.string.relative_time_yesterday)
         } else {
-            val d =
-                DateUtils.getRelativeTimeSpanString(
-                    timestamp,
-                    now,
-                    DateUtils.MINUTE_IN_MILLIS,
-                    DateUtils.FORMAT_ABBREV_RELATIVE
-                )
-            d.toString()
+            relativeTimeSpanString(timestamp, DateUtils.MINUTE_IN_MILLIS).toString()
         }
+    }
+
+    fun getRelativeTimeSpan(t: Long?): CharSequence? {
+        if (t == null || t <= 0L) return "0"
+        return relativeTimeSpanString(t)
+    }
+
+    private fun relativeTimeSpanString(
+        timestamp: Long,
+        minResolution: Long = DateUtils.SECOND_IN_MILLIS
+    ): CharSequence {
+        return DateUtils.getRelativeTimeSpanString(
+            timestamp,
+            System.currentTimeMillis(),
+            minResolution,
+            DateUtils.FORMAT_ABBREV_RELATIVE
+        )
     }
 
     // ref: https://stackoverflow.com/a/3006423
