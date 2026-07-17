@@ -46,6 +46,7 @@ import com.celzero.bravedns.database.Severity
 import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.TcpProxyHelper
+import com.celzero.bravedns.ui.bottomsheet.BlockFreeDnsModeBottomSheet
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.Constants.Companion.MAX_ENDPOINT
 import com.celzero.bravedns.util.InternetProtocol
@@ -391,7 +392,7 @@ internal constructor(
         }
 
         // for debug builds
-        if (DEBUG && !persistentState.advSettingForcePTMode) {
+        if (DEBUG && persistentState.advSettingForcePTMode) {
             return ProtoTranslationMode.PTMODENO46
         }
         return ProtoTranslationMode.PTMODEAUTO
@@ -1247,6 +1248,9 @@ internal constructor(
         sb.append("   App version: ${persistentState.appVersion}\n")
         sb.append("   Brave mode: ${getBraveMode()}\n")
         sb.append("   DNS type: ${getDnsType()}\n")
+        sb.append("   ALG: ${persistentState.enableDnsAlg}\n")
+        sb.append("   Split: ${persistentState.splitDns}\n")
+        sb.append("   Bypass-DNS-mode: ${BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.fromMode(persistentState.blockFreeDnsMode).name}\n")
         sb.append("   Proxy type: ${ProxyType.of(getProxyType()).name}\n")
         sb.append("   Proxy provider: ${getProxyProvider()}\n")
         sb.append("   Pcap mode: ${getPcapFilePath()}\n")

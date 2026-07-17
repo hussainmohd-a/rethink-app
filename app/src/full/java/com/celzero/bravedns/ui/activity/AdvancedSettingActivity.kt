@@ -66,7 +66,7 @@ class AdvancedSettingActivity : BaseActivity(R.layout.activity_advanced_setting)
             b.settingsAutoDialRl.visibility = View.VISIBLE
             b.dvAutoDialSwitch.isChecked = persistentState.autoDialsParallel
             b.settingsResetTourRl.visibility = View.VISIBLE
-            b.dvPtModeSwitch.isChecked = persistentState.advSettingForcePTMode
+            b.dvPtModeSwitch.isChecked = !persistentState.advSettingForcePTMode
             b.settingsPtModeRl.visibility = View.VISIBLE
             b.settingsGoMaxMemoryLl.visibility = View.VISIBLE
             val maxMemMb = (persistentState.goMaxMemory / (1024 * 1024)).toInt()
