@@ -314,7 +314,9 @@ class ProxyCountriesBtmSheet :
     }
 
     private suspend fun uiCtx(f: suspend () -> Unit) {
-        withContext(Dispatchers.Main) { f() }
+        withContext(Dispatchers.Main) {
+            if (_binding != null) { f() }
+        }
     }
 
 }
