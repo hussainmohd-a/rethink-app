@@ -68,6 +68,8 @@ class BlockedAppsBubbleViewModel(
             // Merge by UID. Sum counts, take max(lastBlocked).
             val merged = LinkedHashMap<Int, Pair<Long, Int>>()
             fun merge(uid: Int, last: Long, count: Int) {
+                if (uid < 0) return
+
                 val prev = merged[uid]
                 if (prev == null) {
                     merged[uid] = last to count
