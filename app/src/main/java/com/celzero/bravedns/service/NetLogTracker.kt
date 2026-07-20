@@ -196,9 +196,6 @@ internal constructor(
 
         transaction.responseCalendar = Calendar.getInstance()
 
-        // TODO: This method should be part of BraveVPNService
-        dnsdb.updateVpnConnectionState(transaction)
-
         if (!persistentState.logsEnabled) return
 
         serializer("writeDnsLog", looper) {
