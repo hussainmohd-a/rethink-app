@@ -144,8 +144,6 @@ object IpInfoDownloader: KoinComponent {
 
 
     private suspend fun performIpInfoDownload(ipToLookup: String): Boolean {
-        if (DEBUG) OkHttpDebugLogging.enableHttp2()
-        if (DEBUG) OkHttpDebugLogging.enableTaskRunner()
 
         if (System.currentTimeMillis() < retryAfterTimestamp) {
             val remainingTime = retryAfterTimestamp - System.currentTimeMillis()
@@ -205,6 +203,19 @@ object IpInfoDownloader: KoinComponent {
             Logger.i(LOG_TAG_DOWNLOAD, "$TAG; err while download: ${e.localizedMessage}")
             false
         }
+    }
+
+    suspend fun getIpInfo(ip: String): IpInfo? {
+        if (!persistentState.downloadIpInfo) return null
+
+        val isLanIp = isLanIp(ip)
+        if (isLanIp == null || isLanIp) return null
+
+        val existing = db.getIpInfo(ip)
+        if (existing != null) return existing
+
+        fetchIpInfoIfRequired(ip)
+        return null
     }
 
     private fun parseIpInfoFromJson(ipInfoJson: JsonObject): IpInfo? {

@@ -33,9 +33,11 @@ import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.celzero.bravedns.R
+import com.celzero.bravedns.customdownloader.IpInfoDownloader
 import com.celzero.bravedns.data.AppConfig
 import com.celzero.bravedns.database.RethinkDnsEndpoint
 import com.celzero.bravedns.databinding.RethinkEndpointListItemBinding
+import com.celzero.bravedns.service.IpRulesManager
 import com.celzero.bravedns.service.RethinkBlocklistManager
 import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.activity.ConfigureRethinkBasicActivity
@@ -49,6 +51,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 class RethinkEndpointAdapter(private val context: Context, private val appConfig: AppConfig) :
     PagingDataAdapter<RethinkDnsEndpoint, RethinkEndpointAdapter.RethinkEndpointViewHolder>(
@@ -128,13 +131,15 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
                 b.rethinkEndpointListUrlExplanation.text = ""
                 b.rethinkEndpointListUrlExplanation.visibility = View.GONE
             }
+
+            io { updateFlag(endpoint) }
         }
 
         private fun keepSelectedStatusUpdated(endpoint: RethinkDnsEndpoint) {
             statusCheckJob = io {
                 while (true) {
                     updateBlocklistStatusText(endpoint)
-                    delay(ONE_SEC)
+                    delay(ONE_SEC.milliseconds)
                 }
             }
         }
@@ -252,6 +257,38 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
             intent.putExtra(ConfigureRethinkBasicActivity.RETHINK_BLOCKLIST_NAME, endpoint.name)
             intent.putExtra(ConfigureRethinkBasicActivity.RETHINK_BLOCKLIST_URL, endpoint.url)
             context.startActivity(intent)
+        }
+
+        private suspend fun updateFlag(endpoint: RethinkDnsEndpoint) {
+            var ip: String? = null
+
+            if (endpoint.isActive) {
+                val addr = VpnController.getDnsAddr(Backend.Preferred)
+                ip = addr?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
+            }
+
+            if (ip.isNullOrBlank()) {
+                ip = Utilities.getIpForUrl(context, endpoint.url)
+            }
+
+            if (ip.isNullOrBlank()) {
+                uiCtx { b.rethinkEndpointListUrlFlagText.visibility = View.GONE }
+                return
+            }
+
+            val ipInfo = IpInfoDownloader.getIpInfo(ip)
+            uiCtx {
+                if (ipInfo != null && ipInfo.countryCode.isNotEmpty()) {
+                    b.rethinkEndpointListUrlFlagText.text = Utilities.getFlag(ipInfo.countryCode)
+                    b.rethinkEndpointListUrlFlagText.visibility = View.VISIBLE
+                } else {
+                    b.rethinkEndpointListUrlFlagText.visibility = View.GONE
+                }
+            }
+        }
+
+        private fun stripPort(addr: String): String {
+            return IpRulesManager.splitHostPort(addr).first
         }
 
         private suspend fun uiCtx(f: suspend () -> Unit) {
