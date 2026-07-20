@@ -86,6 +86,7 @@ import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.util.Utilities.delay
 import com.celzero.bravedns.util.Utilities.getRandomString
 import com.celzero.bravedns.util.Utilities.isAtleastQ
+import com.celzero.bravedns.util.Utilities.isAtleastS
 import com.celzero.bravedns.util.Utilities.isAtleastT
 import com.celzero.bravedns.util.Utilities.isFdroidFlavour
 import com.celzero.bravedns.util.Utilities.showToastUiCentered
@@ -1064,7 +1065,7 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
     private fun showThemeDialog() {
         val alertBuilder = MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
         alertBuilder.setTitle(getString(R.string.settings_theme_dialog_title))
-        val items = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val items = if (isAtleastS()) {
             arrayOf(
                 getString(R.string.settings_theme_dialog_themes_1),
                 getString(R.string.settings_theme_dialog_themes_2),
