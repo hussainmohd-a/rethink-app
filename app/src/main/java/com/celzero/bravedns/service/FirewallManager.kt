@@ -395,7 +395,8 @@ object FirewallManager : KoinComponent {
     }
 
     suspend fun isUidFirewalled(uid: Int): Boolean {
-        return connectionStatus(uid) != ConnectionStatus.ALLOW
+        // see if the UID is firewalled in both metered and unmetered
+        return connectionStatus(uid) == ConnectionStatus.BOTH
     }
 
     suspend fun isUidSystemApp(uid: Int): Boolean {
