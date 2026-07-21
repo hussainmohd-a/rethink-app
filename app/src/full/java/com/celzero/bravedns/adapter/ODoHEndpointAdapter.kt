@@ -273,8 +273,8 @@ class ODoHEndpointAdapter(private val context: Context, private val appConfig: A
             var ip: String? = null
 
             if (endpoint.isSelected) {
-                val addr = VpnController.getDnsAddr(Backend.Preferred)
-                ip = addr?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
+                val ips = VpnController.getDnsIps(Backend.Preferred)
+                ip = ips?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
             }
 
             if (ip.isNullOrBlank()) {

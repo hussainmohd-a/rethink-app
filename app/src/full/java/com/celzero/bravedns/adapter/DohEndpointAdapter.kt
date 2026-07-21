@@ -265,9 +265,9 @@ class DohEndpointAdapter(private val context: Context, private val appConfig: Ap
             var ip: String? = null
 
             if (endpoint.isSelected) {
-                val addr = VpnController.getDnsAddr(Backend.Preferred)
-                ip = addr?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
-                Logger.d(LOG_TAG_UI, "ip for doh1: $ip, addr: $addr, url: ${endpoint.dohURL}")
+                val ips = VpnController.getDnsIps(Backend.Preferred)
+                ip = ips?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
+                Logger.d(LOG_TAG_UI, "ip for doh1: $ip, addr: $ips, url: ${endpoint.dohURL}")
             }
 
             if (ip.isNullOrBlank()) {

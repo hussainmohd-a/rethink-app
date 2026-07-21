@@ -263,8 +263,8 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
             var ip: String? = null
 
             if (endpoint.isActive) {
-                val addr = VpnController.getDnsAddr(Backend.Preferred)
-                ip = addr?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
+                val ips = VpnController.getDnsIps(Backend.Preferred)
+                ip = ips?.split(",")?.firstOrNull()?.trim()?.let { stripPort(it) }
             }
 
             if (ip.isNullOrBlank()) {
