@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.ui.fragment
 
-import Logger
-import Logger.LOG_TAG_DNS
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_DNS
 import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
@@ -42,7 +42,6 @@ import com.celzero.bravedns.scheduler.WorkScheduler.Companion.BLOCKLIST_UPDATE_C
 import com.celzero.bravedns.service.BraveVPNService
 import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.PersistentState
-import com.celzero.bravedns.service.ProxyManager
 import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.service.WireguardManager
 import com.celzero.bravedns.ui.activity.ConfigureRethinkBasicActivity
@@ -51,11 +50,9 @@ import com.celzero.bravedns.ui.activity.PauseActivity
 import com.celzero.bravedns.ui.bottomsheet.BlockFreeDnsModeBottomSheet
 import com.celzero.bravedns.ui.bottomsheet.DnsRecordTypesBottomSheet
 import com.celzero.bravedns.ui.bottomsheet.LocalBlocklistsBottomSheet
-import com.celzero.bravedns.util.NewSettingsManager
 import com.celzero.bravedns.util.SnackbarHelper
 import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.UIUtils.fetchColor
-import com.celzero.bravedns.util.UIUtils.setBadgeDotVisible
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.util.Utilities.isAtleastR
 import com.celzero.bravedns.util.Utilities.isPlayStoreFlavour

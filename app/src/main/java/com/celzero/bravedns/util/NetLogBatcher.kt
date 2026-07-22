@@ -16,7 +16,7 @@
 
 package com.celzero.bravedns.util
 
-import Logger.LOG_BATCH_LOGGER
+import com.celzero.bravedns.util.Logger.LOG_BATCH_LOGGER
 import android.util.Log
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineName

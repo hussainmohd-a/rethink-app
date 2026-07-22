@@ -15,8 +15,7 @@
  */
 package com.celzero.bravedns.util
 
-import Logger
-import Logger.LOG_TAG_FIREWALL
+import com.celzero.bravedns.util.Logger.LOG_TAG_FIREWALL
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager

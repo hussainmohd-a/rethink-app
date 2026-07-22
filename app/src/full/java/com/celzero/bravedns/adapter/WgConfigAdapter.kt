@@ -15,9 +15,9 @@
  */
 package com.celzero.bravedns.adapter
 
-import Logger
-import Logger.LOG_TAG_PROXY
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_PROXY
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.content.Context
 import android.content.Intent
 import android.text.format.DateUtils
@@ -69,7 +69,6 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.core.view.isVisible
 import com.celzero.bravedns.service.IpRulesManager
-import inet.ipaddr.IPAddressString
 
 class WgConfigAdapter(private val context: Context, private val listener: DnsStatusListener, private val splitDns: Boolean, private val eventLogger: EventLogger) :
     PagingDataAdapter<WgConfigFiles, WgConfigAdapter.WgInterfaceViewHolder>(DIFF_CALLBACK) {

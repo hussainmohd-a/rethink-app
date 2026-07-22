@@ -15,9 +15,8 @@
  */
 package com.celzero.bravedns.util
 
-import Logger
-import Logger.LOG_FIREBASE
 import com.celzero.bravedns.service.PersistentState
+import com.celzero.bravedns.util.Logger.LOG_FIREBASE
 import com.celzero.bravedns.util.Utilities.getRandomString
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import org.koin.core.component.KoinComponent

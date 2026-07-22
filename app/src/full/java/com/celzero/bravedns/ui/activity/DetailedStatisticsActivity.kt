@@ -15,7 +15,7 @@
  */
 package com.celzero.bravedns.ui.activity
 
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
@@ -35,6 +35,7 @@ import com.celzero.bravedns.databinding.ActivityDetailedStatisticsBinding
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.ui.BaseActivity
 import com.celzero.bravedns.ui.fragment.SummaryStatisticsFragment
+import com.celzero.bravedns.util.Logger
 import com.celzero.bravedns.util.Themes
 import com.celzero.bravedns.util.Themes.Companion.getCurrentTheme
 import com.celzero.bravedns.util.Utilities.isAtleastQ

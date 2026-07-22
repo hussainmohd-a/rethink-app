@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.database
 
-import Logger
-import Logger.LOG_TAG_PROXY
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_PROXY
 import android.database.sqlite.SQLiteConstraintException
 
 class ProxyAppMappingRepository(

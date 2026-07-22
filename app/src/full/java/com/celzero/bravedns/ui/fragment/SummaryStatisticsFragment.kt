@@ -15,7 +15,7 @@
  */
 package com.celzero.bravedns.ui.fragment
 
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
@@ -40,6 +40,7 @@ import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.ui.activity.DetailedStatisticsActivity
 import com.celzero.bravedns.util.Constants
+import com.celzero.bravedns.util.Logger
 import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.util.Utilities.showToastUiCentered

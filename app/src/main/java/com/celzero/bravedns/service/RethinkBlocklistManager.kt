@@ -15,9 +15,9 @@
  */
 package com.celzero.bravedns.service
 
-import Logger
-import Logger.LOG_TAG_DNS
-import Logger.LOG_TAG_VPN
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_DNS
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import android.content.Context
 import com.celzero.bravedns.R
 import com.celzero.bravedns.data.FileTag

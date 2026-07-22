@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.adapter
 
-import Logger
-import Logger.LOG_TAG_PROXY
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_PROXY
 import android.content.Context
 import android.content.DialogInterface
 import android.content.pm.PackageManager

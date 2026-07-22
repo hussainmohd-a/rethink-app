@@ -15,7 +15,7 @@
  */
 package com.celzero.bravedns.ui.activity
 
-import Logger
+import com.celzero.bravedns.util.Logger
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Context

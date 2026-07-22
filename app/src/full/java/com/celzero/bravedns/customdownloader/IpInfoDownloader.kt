@@ -15,10 +15,9 @@
  */
 package com.celzero.bravedns.customdownloader
 
-import Logger
-import Logger.LOG_TAG_DOWNLOAD
-import Logger.LOG_TAG_VPN
-import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_DOWNLOAD
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import com.celzero.bravedns.database.IpInfo
 import com.celzero.bravedns.database.IpInfoRepository
 import com.celzero.bravedns.service.PersistentState
