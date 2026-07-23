@@ -15,9 +15,6 @@
  */
 package com.celzero.bravedns.adapter
 
-import Logger
-import Logger.LOG_IAB
-import Logger.LOG_TAG_UI
 import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Context
@@ -33,6 +30,9 @@ import com.celzero.bravedns.databinding.ListItemPlaySubsBinding
 import com.celzero.bravedns.databinding.ListItemShimmerCardBinding
 import com.celzero.bravedns.iab.InAppBillingHandler
 import com.celzero.bravedns.iab.ProductDetail
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_IAB
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import com.celzero.bravedns.util.UIUtils.fetchColor
 import com.facebook.shimmer.ShimmerFrameLayout
 import java.util.Locale
