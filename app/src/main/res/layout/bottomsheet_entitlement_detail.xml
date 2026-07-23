@@ -91,7 +91,6 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_dismiss"
-            style="@style/Widget.Material3.Button.TonalButton"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:layout_marginTop="24dp"
