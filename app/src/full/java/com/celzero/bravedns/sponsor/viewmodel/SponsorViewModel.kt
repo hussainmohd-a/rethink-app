@@ -55,7 +55,7 @@ data class SponsorUiState(
     companion object {
         // Selectable contribution levels, in slider order.
         // Range: $1 (min) -> $100 (max); default $5.
-        val SUPPORTED_AMOUNTS = listOf(1, 2, 3, 4, 5, 10, 15, 25, 50, 100)
+        val SUPPORTED_AMOUNTS = listOf(1, 5, 10, 15, 25, 50, 100)
 
         const val DEFAULT_AMOUNT = 5
         private val DEFAULT_INDEX = SUPPORTED_AMOUNTS.indexOf(DEFAULT_AMOUNT)

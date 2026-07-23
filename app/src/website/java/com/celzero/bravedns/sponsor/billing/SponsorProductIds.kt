@@ -28,9 +28,6 @@ object SponsorProductIds {
      */
     private val AMOUNT_TO_PRODUCT = mapOf(
         1 to "sponsor.tier.1",
-        2 to "sponsor.tier.2",
-        3 to "sponsor.tier.3",
-        4 to "sponsor.tier.4",
         5 to "sponsor.tier.5",
         10 to "sponsor.tier.10",
         15 to "sponsor.tier.15",
