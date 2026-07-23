@@ -101,7 +101,7 @@ class BlockFreeDnsModeBottomSheet : BottomSheetDialogFragment() {
         } else {
             val defaultMode = if (isAtleastR()) BlockFreeDnsMode.AUTO else BlockFreeDnsMode.FALLBACK
             val modeLabel = when (defaultMode) {
-                BlockFreeDnsMode.FALLBACK -> getString(R.string.bfdm_option_fallback_label)
+                BlockFreeDnsMode.FALLBACK -> getString(R.string.bfdm_option_bootstrap_label)
                 BlockFreeDnsMode.GLOBAL -> getString(R.string.bfdm_option_global_label)
                 BlockFreeDnsMode.AUTO -> getString(R.string.bfdm_option_auto_label)
             }

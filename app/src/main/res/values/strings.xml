@@ -122,7 +122,7 @@
     <string name="lbl_hop" translatable="true">Relays</string>
     <string name="lbl_ipinfo_inc" translatable="false">IPinfo Inc.</string>
     <string name="lbl_manual" translatable="true">Manual</string>
-    <string name="lbl_fallback" translatable="true">Fallback</string>
+    <string name="lbl_bootstrap" translatable="true">Bootstrap</string>
     <string name="lbl_default" translatable="true">Default</string>
     <string name="lbl_action" translatable="true">Action</string>
     <string name="lbl_connect" translatable="true">Connect</string>
@@ -257,8 +257,6 @@
     <string name="status_protected" description="This is a large message in a reassuring color. It indicates that DNS queries can't be surveilled or modified in transit." translatable="true">
     protected
     </string>
-
-    <string name="failed_using_default" translatable="true">Failed: using fallback DNS</string>
 
     <string name="status_app_error" translatable="true">app error</string>
 
@@ -709,8 +707,8 @@
 
     <string name="settings_protocol_translation_dns_inactive" translatable="true">Switch to DNS/DNS+Firewall mode to enable this setting</string>
 
-    <string name="settings_default_dns_heading" translatable="true">Choose fallback DNS</string>
-    <string name="settings_default_dns_desc" translatable="true">In rare cases when user-preferred DNS could not be ascertained, fallback DNS is used.</string>
+    <string name="settings_default_dns_heading" translatable="true">Choose Bootstrap DNS</string>
+    <string name="settings_default_dns_desc" translatable="true">Used only during startup to find the IP address of the encrypted DNS server.</string>
 
     <string name="settings_pcap_heading" translatable="true">Packet capture</string>
     <string name="settings_pcap_dialog_title" translatable="true">PCAP</string>
@@ -1870,8 +1868,8 @@
 
     <string name="vpn_policy_title" translatable="true">Connection change policy</string>
 
-    <string name="use_fallback_dns_to_bypass" translatable="true">Use fallback DNS as bypass</string>
-    <string name="use_fallback_dns_to_bypass_desc" translatable="true">When enabled, always uses fallback DNS for bypassed apps, domains, and IPs.</string>
+    <string name="use_bootstrap_dns_to_bypass" translatable="true">Use bootstrap DNS as bypass</string>
+    <string name="use_bootstrap_dns_to_bypass_desc" translatable="true">When enabled, always uses bootstrap DNS for bypassed domains, and IPs.</string>
 
     <!-- alert, commenting out for now in v055b -->
 
@@ -2059,8 +2057,8 @@
     <string name="lockdown_check_dialog_subtitle" translatable="false">Some settings may conflict with Proxy Lockdown mode. Review below.</string>
     <string name="lockdown_check_dns_system" translatable="false">System DNS</string>
     <string name="lockdown_check_dns_system_desc" translatable="false">Using system DNS can bypass the lockdown proxy.</string>
-    <string name="lockdown_check_dns_fallback" translatable="false">Fallback DNS</string>
-    <string name="lockdown_check_dns_fallback_desc" translatable="false">Fallback DNS is set to System which can bypass the lockdown proxy.</string>
+    <string name="lockdown_check_dns_bootstrap" translatable="false">Bootstrap DNS</string>
+    <string name="lockdown_check_dns_bootstrap_desc" translatable="false">Bootstrap DNS is set to System which can bypass the lockdown proxy.</string>
     <string name="lockdown_check_dns_proxy" translatable="false">DNS Proxy</string>
     <string name="lockdown_check_dns_proxy_desc" translatable="false">DNS proxy with app (%1$s) conflicts with lockdown.</string>
     <string name="lockdown_check_orbot" translatable="false">Orbot Proxy</string>
@@ -2640,8 +2638,8 @@
     <!-- DNS bypass mode bottom sheet -->
     <string name="bfdm_heading" translatable="false">DNS for bypass</string>
     <string name="bfdm_desc" translatable="false">Select the DNS to use for trusted and bypassed ips and domains</string>
-    <string name="bfdm_option_fallback_label" translatable="false">Use fallback DNS</string>
-    <string name="bfdm_option_fallback_desc" translatable="false">Use the fallback DNS for trusted and bypassed connections</string>
+    <string name="bfdm_option_bootstrap_label" translatable="false">Use Bootstrap DNS</string>
+    <string name="bfdm_option_bootstrap_desc" translatable="false">Use the bootstrap DNS for trusted and bypassed connections</string>
     <string name="bfdm_option_global_label" translatable="false">Use Global DNS</string>
     <string name="bfdm_option_global_desc" translatable="false">Use the globally configured DNS for trusted and bypassed connections</string>
     <string name="bfdm_option_auto_label" translatable="false">Automatic</string>

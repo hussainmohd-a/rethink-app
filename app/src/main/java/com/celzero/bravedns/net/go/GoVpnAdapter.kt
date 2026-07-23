@@ -33,7 +33,7 @@ import com.celzero.bravedns.R
 import com.celzero.bravedns.data.AppConfig
 import com.celzero.bravedns.data.AppConfig.Companion.DOH_INDEX
 import com.celzero.bravedns.data.AppConfig.Companion.DOT_INDEX
-import com.celzero.bravedns.data.AppConfig.Companion.FALLBACK_DNS_IF_NET_DNS_EMPTY
+import com.celzero.bravedns.data.AppConfig.Companion.BOOTSTRAP_DNS_IF_NET_DNS_EMPTY
 import com.celzero.bravedns.data.AppConfig.TunnelOptions
 import com.celzero.bravedns.database.ConnectionTrackerRepository
 import com.celzero.bravedns.database.CountryConfig
@@ -1912,10 +1912,10 @@ class GoVpnAdapter : KoinComponent {
             } else if (netDns2?.isNotEmpty() == true) {
                 netDns2
             } else {
-                FALLBACK_DNS_IF_NET_DNS_EMPTY
+                BOOTSTRAP_DNS_IF_NET_DNS_EMPTY
             }
         } catch (_: Exception) {
-            FALLBACK_DNS_IF_NET_DNS_EMPTY
+            BOOTSTRAP_DNS_IF_NET_DNS_EMPTY
         }
     }
 

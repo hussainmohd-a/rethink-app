@@ -1292,7 +1292,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                     if (failing && isAdded && view != null) {
                         b.fhsCardDnsLatency.visibility = View.INVISIBLE
                         b.fhsCardDnsFailure.visibility = View.VISIBLE
-                        b.fhsCardDnsFailure.text = getString(R.string.failed_using_default)
+                        b.fhsCardDnsFailure.text = getString(R.string.status_failing)
                     }
                 }
             }

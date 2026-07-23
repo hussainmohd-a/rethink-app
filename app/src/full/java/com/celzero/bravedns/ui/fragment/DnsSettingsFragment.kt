@@ -839,7 +839,7 @@ class DnsSettingsFragment : Fragment(R.layout.fragment_dns_configure),
             }
         }
         val modeLabel = when (blockFreeMode) {
-            BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.FALLBACK -> getString(R.string.bfdm_option_fallback_label)
+            BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.FALLBACK -> getString(R.string.bfdm_option_bootstrap_label)
             BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.GLOBAL -> getString(R.string.bfdm_option_global_label)
             BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.AUTO -> getString(R.string.bfdm_option_auto_label)
         }

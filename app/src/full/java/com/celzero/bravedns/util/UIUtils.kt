@@ -68,7 +68,7 @@ import java.util.regex.Pattern
 object UIUtils {
 
     fun getDnsStatusStringRes(status: Int?): Int {
-        if (status == null) return R.string.failed_using_default
+        if (status == null) return R.string.status_failing
 
         return when (Transaction.Status.fromId(status)) {
             Transaction.Status.START -> {

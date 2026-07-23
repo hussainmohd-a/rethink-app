@@ -1097,7 +1097,7 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
 
     private enum class CheckType {
         SYSTEM_DNS,
-        FALLBACK_DNS,
+        BOOTSTRAP_DNS,
         DNS_PROXY,
         ORBOT,
         HTTP_PROXY,
@@ -1121,14 +1121,14 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
             )
         )
 
-        // 2. Fallback DNS check
-        val isFallbackSystemDns = persistentState.defaultDnsUrl.isEmpty()
+        // 2. Bootstrap DNS check
+        val isBootstrapSystemDns = persistentState.defaultDnsUrl.isEmpty()
         checks.add(
             LockdownCheckItem(
-                label = getString(R.string.lockdown_check_dns_fallback),
-                description = getString(R.string.lockdown_check_dns_fallback_desc),
-                hasConflict = isFallbackSystemDns,
-                type = CheckType.FALLBACK_DNS
+                label = getString(R.string.lockdown_check_dns_bootstrap),
+                description = getString(R.string.lockdown_check_dns_bootstrap_desc),
+                hasConflict = isBootstrapSystemDns,
+                type = CheckType.BOOTSTRAP_DNS
             )
         )
 
@@ -1253,8 +1253,8 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
                     CheckType.SYSTEM_DNS -> {
                         appConfig.enableRethinkDnsPlus()
                     }
-                    CheckType.FALLBACK_DNS -> {
-                        // set rethink as the fallback dns
+                    CheckType.BOOTSTRAP_DNS -> {
+                        // set rethink as the bootstrap dns
                         persistentState.defaultDnsUrl = Constants.DEFAULT_DNS_LIST[1].url
                     }
                     CheckType.DNS_PROXY -> {

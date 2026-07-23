@@ -84,7 +84,7 @@ internal constructor(
 
         private const val ORBOT_DNS = "Orbot"
 
-        const val FALLBACK_DNS_IF_NET_DNS_EMPTY = "9.9.9.9,2620:fe::fe"
+        const val BOOTSTRAP_DNS_IF_NET_DNS_EMPTY = "9.9.9.9,2620:fe::fe"
 
         // used to add index to the transport ids added as part of Plus transport
         // for now only DOH, DoT are supported
@@ -1274,7 +1274,7 @@ internal constructor(
         sb.append("   vpn tun metered? ${persistentState.setVpnBuilderToMetered}\n")
         sb.append("   meter mobile nw: ${persistentState.treatOnlyMobileNetworkAsMetered}\n")
         sb.append("   loopback? ${persistentState.routeRethinkInRethink}\n")
-        sb.append("   fallback dns: ${persistentState.defaultDnsUrl}\n")
+        sb.append("   bootstrap dns: ${persistentState.defaultDnsUrl}\n")
         sb.append("   conn policy: ${persistentState.vpnBuilderPolicy}\n")
         sb.append("   loopback proxy fwdr apps: ${!persistentState.excludeAppsInProxy}\n")
         sb.append("   randomize wg port: ${persistentState.randomizeListenPort}\n")
