@@ -47,10 +47,10 @@ object FirebaseErrorReporting : KoinComponent {
                 val newToken = getRandomString(TOKEN_LENGTH)
                 persistentState.firebaseUserToken = newToken
                 persistentState.firebaseUserTokenTimestamp = System.currentTimeMillis()
-                crashlytics.setUserId(newToken)
+                setUserId(newToken)
                 Logger.i(LOG_FIREBASE, "generated new firebase token: $newToken")
             } else {
-                crashlytics.setUserId(token)
+                setUserId(token)
                 Logger.i(LOG_FIREBASE, "existing firebase token found: $token")
             }
             setEnabled(persistentState.firebaseErrorReportingEnabled)
