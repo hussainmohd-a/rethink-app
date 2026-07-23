@@ -15,13 +15,13 @@
  */
 package com.celzero.bravedns.iab
 
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_IAB
 import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.ConsumeParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.celzero.bravedns.iab.InAppBillingHandler.BestPlan
-import com.celzero.bravedns.util.Logger
-import com.celzero.bravedns.util.Logger.LOG_IAB
 
 internal class QueryUtils(private val billingClient: BillingClient) {
     companion object {
