@@ -1154,5 +1154,16 @@
         <item name="homeScreenBtnGradientStart">@color/alpha_accent_light</item>
     </style>
 
+    <style name="Widget.Sponsor.Slider" parent="Widget.Material3.Slider">
+        <item name="android:stepSize">1</item>
+        <item name="tickVisible">true</item>
+        <item name="labelBehavior">floating</item>
+        <item name="thumbRadius">14dp</item>
+        <item name="haloRadius">28dp</item>
+        <item name="trackHeight">8dp</item>
+        <item name="thumbElevation">2dp</item>
+        <item name="haloColor">?attr/colorPrimaryContainer</item>
+    </style>
+
 
 </resources>
