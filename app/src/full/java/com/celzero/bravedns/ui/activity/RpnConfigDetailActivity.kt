@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.ui.activity
 
-import Logger
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -25,17 +25,14 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.DrawableWrapper
-import android.os.Build
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.format.DateUtils
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -46,7 +43,6 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.withRotation
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.transition.Visibility
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
 import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
@@ -377,7 +373,11 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         val addrs = info.addr.split(",")
 
         addrs.forEachIndexed { index, addr ->
-            if (index == 1) { sb.append("\n") } else if (index > 1) { sb.append(" · ") }
+            if (index == 1) {
+                sb.append("\n")
+            } else if (index > 1) {
+                sb.append(" · ")
+            }
 
             val start = sb.length
             sb.append(addr.trim())
@@ -445,7 +445,10 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             val ls = sb.length
             sb.append(label)
             styleLabel(ls, sb.length)
-            sb.append("  $value")
+            val vs = sb.length
+            sb.append(value)
+            sb.setSpan(TypefaceSpan("monospace"), vs, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(RelativeSizeSpan(1.07f), vs, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         // ip
@@ -453,7 +456,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         sb.append(meta.ip ?: "")
         val ipEnd = sb.length
         sb.setSpan(TypefaceSpan("monospace"), ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        sb.setSpan(RelativeSizeSpan(1.07f),   ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        sb.setSpan(RelativeSizeSpan(1.07f), ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         // asn
         val asnParts = buildList {
@@ -464,17 +467,17 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             if (org.isNotBlank()) add(org)
             if (dom.isNotBlank()) add(dom)
         }
-        if (asnParts.isNotEmpty()) appendLine("", asnParts.joinToString("  ·  "))
+        if (asnParts.isNotEmpty()) appendLine("", asnParts.joinToString(" · "))
 
         // loc, do not show client location for now as it is confusing
-        /*val locParts = buildList {
+        /* val locParts = buildList {
             val city = meta.city ?: ""
             val lat = meta.lat
             val lon = meta.lon
             if (city.isNotBlank()) add(city)
             if (lat != 0.0 || lon != 0.0) add(String.format(Locale.US, "%.4f°, %.4f°", lat, lon))
         }
-        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))*/
+        if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString(" · ")) */
 
         return sb
     }
@@ -516,7 +519,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         val stats = VpnController.getProxyStats(pid)
         val config = countryConfig
         // Use the time when this server key was selected by the user, not the VPN uptime.
-        val selectedSinceTs = RpnProxyManager.getSelectedSinceTs(id)
+        val selectedSinceTs = stats?.since ?: 0L
 
         uiCtx {
             applyStats(statusPair, stats, config, selectedSinceTs)
