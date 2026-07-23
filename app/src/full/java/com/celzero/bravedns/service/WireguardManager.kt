@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.service
 
-import Logger
-import Logger.LOG_TAG_PROXY
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_PROXY
 import android.content.Context
 import android.text.format.DateUtils
 import com.celzero.bravedns.backup.BackupHelper.Companion.TEMP_WG_DIR
@@ -34,7 +34,6 @@ import com.celzero.bravedns.wireguard.Peer
 import com.celzero.bravedns.wireguard.WgHopManager
 import com.celzero.bravedns.wireguard.WgInterface
 import com.celzero.firestack.backend.Backend
-import com.celzero.firestack.backend.IPMetadata
 import com.celzero.firestack.backend.RouterStats
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -524,7 +523,6 @@ object WireguardManager : KoinComponent {
 
     // no need to check for app excluded from proxy here, expected to call this fn after that
     suspend fun getAllPossibleConfigIdsForApp(uid: Int, ip: String, port: Int, domain: String, usesMobileNw: Boolean, ssid: String, default: String): List<String> {
-        val block = Backend.Block
         val proxyIds: MutableList<String> = mutableListOf()
 
         if (oneWireGuardEnabled()) {
@@ -1147,6 +1145,14 @@ object WireguardManager : KoinComponent {
             val stats = VpnController.getWireGuardStats(id)
             val routerStats = stats?.routerStats
             sb.append("   id: ${it.id}, name: ${it.name}\n")
+            sb.append("   always-on? ${it.isCatchAll}\n")
+            sb.append("   lockdown? ${it.isLockdown}\n")
+            sb.append("   mobile-only? ${it.useOnlyOnMetered}\n")
+            sb.append("   ssid-only? ${it.ssidEnabled}")
+            if (it.ssidEnabled) {
+                sb.append(", ssids: ${it.ssids}")
+            }
+            sb.append("\n")
             sb.append("   ifaddr: ${routerStats?.addrs}").append("\n")
             sb.append("   mtu: ${stats?.mtu}\n")
             sb.append("   status: ${routerStats?.status}\n")

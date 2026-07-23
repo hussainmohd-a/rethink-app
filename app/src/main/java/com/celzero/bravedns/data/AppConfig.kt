@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.data
 
-import Logger
-import Logger.LOG_TAG_VPN
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import android.content.Context
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
@@ -1247,17 +1247,49 @@ internal constructor(
         val sb = StringBuilder()
         sb.append("   App version: ${persistentState.appVersion}\n")
         sb.append("   Brave mode: ${getBraveMode()}\n")
-        sb.append("   DNS type: ${getDnsType()}\n")
-        sb.append("   ALG: ${persistentState.enableDnsAlg}\n")
-        sb.append("   Split: ${persistentState.splitDns}\n")
-        sb.append("   Bypass-DNS-mode: ${BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.fromMode(persistentState.blockFreeDnsMode).name}\n")
+
+        sb.append("   DNS \n")
+        sb.append("   dns type: ${getDnsType()}\n")
+        sb.append("   connected dns: ${persistentState.connectedDnsName}\n")
+        sb.append("   alg: ${persistentState.enableDnsAlg}\n")
+        sb.append("   split: ${persistentState.splitDns}\n")
+        sb.append("   local blocklist enabled: ${persistentState.blocklistEnabled}\n")
+        sb.append("   local blocklist stamp: ${persistentState.localBlocklistStamp}\n")
+        sb.append("   show icons: ${persistentState.fetchFavIcon}\n")
+        sb.append("   dns booster: ${persistentState.enableDnsCache}\n")
+        sb.append("   never proxy dns: ${!persistentState.proxyDns}\n")
+        sb.append("   prevent dns leaks: ${persistentState.preventDnsLeaks}\n")
+        sb.append("   block dns from unknown src: ${persistentState.blockDnsForUnknownApp}\n")
+        sb.append("   use sys dns for undelegated dms: ${persistentState.useSystemDnsForUndelegatedDomains}\n")
+        sb.append("   bypass-dns-mode: ${BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.fromMode(persistentState.blockFreeDnsMode).name}\n")
+
+        sb.append("   Proxy \n")
         sb.append("   Proxy type: ${ProxyType.of(getProxyType()).name}\n")
         sb.append("   Proxy provider: ${getProxyProvider()}\n")
-        sb.append("   Pcap mode: ${getPcapFilePath()}\n")
-        sb.append("   Connected DNS: ${persistentState.connectedDnsName}\n")
-        sb.append("   Prevent DNS leaks: ${persistentState.preventDnsLeaks}\n")
-        sb.append("   Internet protocol: ${getInternetProtocol()}\n")
-        sb.append("   Protocol translation mode: ${getProtocolTranslationMode()}\n")
+
+        sb.append("   VPN \n")
+        sb.append("   stall on nw loss: ${persistentState.stallOnNoNetwork}\n")
+        sb.append("   do not route private ips: ${!persistentState.privateIps}\n")
+        sb.append("   use all available nws: ${persistentState.useMultipleNetworks}\n")
+        sb.append("   vpn tun metered? ${persistentState.setVpnBuilderToMetered}\n")
+        sb.append("   meter mobile nw: ${persistentState.treatOnlyMobileNetworkAsMetered}\n")
+        sb.append("   loopback? ${persistentState.routeRethinkInRethink}\n")
+        sb.append("   fallback dns: ${persistentState.defaultDnsUrl}\n")
+        sb.append("   conn policy: ${persistentState.vpnBuilderPolicy}\n")
+        sb.append("   loopback proxy fwdr apps: ${!persistentState.excludeAppsInProxy}\n")
+        sb.append("   randomize wg port: ${persistentState.randomizeListenPort}\n")
+        sb.append("   global proxy lockdown: ${persistentState.wgGlobalLockdown}\n")
+        sb.append("   flood wg: ${persistentState.floodWireGuard}\n")
+        sb.append("   persistent keepalive: ${persistentState.smartPersistentKeepalive}\n")
+        sb.append("   shorter TCP keepalive: ${persistentState.tcpKeepAlive}\n")
+        sb.append("   endpoint independent mapping: ${persistentState.endpointIndependence}\n")
+        sb.append("   idle timeout: ${persistentState.dialTimeoutSec}\n")
+        sb.append("   bandwidth booster: ${persistentState.useMaxMtu}\n")
+        sb.append("   socket buffer sz: ${persistentState.socketBufferSizeBytes}\n")
+        sb.append("   internet protocol: ${getInternetProtocol()}\n")
+        sb.append("   protocol translation mode: ${getProtocolTranslationMode()}\n")
+        sb.append("   remember uninstalled apps: ${persistentState.tombstoneApps}\n")
+        sb.append("   pcap mode: ${getPcapFilePath()}\n")
 
         return sb.toString()
     }
