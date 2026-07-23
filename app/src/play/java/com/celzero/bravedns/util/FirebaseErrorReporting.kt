@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.util
 
-import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.util.Logger.LOG_FIREBASE
+import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.util.Utilities.getRandomString
 import com.google.firebase.crashlytics.FirebaseCrashlytics
 import org.koin.core.component.KoinComponent
@@ -115,6 +115,7 @@ object FirebaseErrorReporting : KoinComponent {
         try {
             val crashlytics = FirebaseCrashlytics.getInstance()
             crashlytics.setUserId(userId)
+            Logger.d(LOG_FIREBASE, "crashlytics user-id set to: $userId")
         } catch (e: Exception) {
             Logger.w(LOG_FIREBASE, "err; set user-id crashlytics: ${e.message}")
         }
