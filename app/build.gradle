@@ -19,7 +19,7 @@ def alphaBuild = taskNames.contains("alpha")
 // check for fdroidserver value is set in system env
 def fdroidBuildServer = System.getenv("fdroidserver")
 def isFdroidBuildServer = fdroidBuildServer != null && !fdroidBuildServer.isEmpty() && fdroidBuildServer != "null"
-def deGoogled = !apkBuild || fdroidBuild || isFdroidBuildServer
+def deGoogled = !apkBuild || fdroidBuild || isFdroidBuildServer || alphaBuild
 def shouldSplit = !alphaBuild
 
 // Pass -PwebsiteDegoogled=true when building the fdroid flavor with our own keys.
