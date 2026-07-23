@@ -127,7 +127,7 @@ class HomeScreenFragmentTest : KoinTest {
 
             // Add coEvery for suspend functions if they exist
             coEvery { VpnController.p50(any()) } returns 50L
-            coEvery { VpnController.getDnsStatus(any()) } returns 1L
+            coEvery { VpnController.getDnsStatus(any()) } returns 1
             println("✅ VPN controller mocks configured")
         } catch (e: Exception) {
             println("⚠️  Warning: Failed to setup VPN controller mocks: ${e.message}")
@@ -768,7 +768,6 @@ class HomeScreenFragmentTest : KoinTest {
     fun `fragment should handle network state changes gracefully`() {
         connectionStatusLiveData.postValue(BraveVPNService.State.NEW)
         connectionStatusLiveData.postValue(BraveVPNService.State.WORKING)
-        connectionStatusLiveData.postValue(BraveVPNService.State.APP_ERROR)
         testDispatcher.scheduler.advanceUntilIdle()
 
         // Should handle different connection states

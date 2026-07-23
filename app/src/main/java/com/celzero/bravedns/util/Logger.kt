@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.celzero.bravedns.util
+
 import android.app.Application
 import android.util.Log
 import com.celzero.bravedns.database.ConsoleLog
@@ -32,7 +34,7 @@ object Logger : KoinComponent {
             if (_logLevel == null) {
                 _logLevel = try {
                     persistentState.goLoggerLevel
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Fallback for tests or when Koin is not initialized
                     LoggerLevel.ERROR.id
                 }

@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.ui.activity
 
-import Logger
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -25,7 +25,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.DrawableWrapper
 import android.os.Bundle
@@ -34,7 +33,6 @@ import android.text.Spanned
 import android.text.format.DateUtils
 import android.text.style.ForegroundColorSpan
 import android.text.style.RelativeSizeSpan
-import android.text.style.StyleSpan
 import android.text.style.TypefaceSpan
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -45,7 +43,6 @@ import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.graphics.withRotation
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.transition.Visibility
 import by.kirich1409.viewbindingdelegate.viewBinding
 import com.celzero.bravedns.R
 import com.celzero.bravedns.RethinkDnsApplication.Companion.DEBUG
@@ -115,7 +112,14 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
     private val ssidPermissionCallback = object : SsidPermissionManager.PermissionCallback {
         override fun onPermissionsGranted() {
             Logger.vv(LOG_TAG_UI, "ssid-callback permissions granted")
-            ui { refreshSsidSection() }
+            // Check if we need background location too
+            if (isAtleastQ() && !SsidPermissionManager.hasBackgroundLocationPermission(this@RpnConfigDetailActivity)) {
+                showLocationDisclosureDialog {
+                    SsidPermissionManager.requestBackgroundLocationPermission(this@RpnConfigDetailActivity)
+                }
+            } else {
+                ui { refreshSsidSection() }
+            }
         }
         override fun onPermissionsDenied() {
             Logger.vv(LOG_TAG_UI, "ssid-callback permissions denied")
@@ -123,7 +127,9 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         }
         override fun onPermissionsRationale() {
             Logger.vv(LOG_TAG_UI, "ssid-callback permissions rationale")
-            showSsidPermissionExplanationDialog()
+            showLocationDisclosureDialog {
+                SsidPermissionManager.requestSsidPermissions(this@RpnConfigDetailActivity)
+            }
         }
     }
 
@@ -362,44 +368,23 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
      */
     private fun buildAddlInfoSpan(info: RpnProxyManager.ActiveRpnAddlInfo): SpannableStringBuilder {
         val sb = SpannableStringBuilder()
-        val labelColor = fetchColor(this, R.attr.primaryLightColorText)
-
-        fun styleLabel(start: Int, end: Int) {
-            sb.setSpan(ForegroundColorSpan(labelColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(RelativeSizeSpan(0.80f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        }
-
-        fun appendLine(label: String, value: String) {
-            if (value.isBlank()) return
-            sb.append("\n")
-            val ls = sb.length
-            sb.append(label)
-            sb.append(" · $value")
-            styleLabel(ls, sb.length)
-        }
 
         // addr
         val addrs = info.addr.split(",")
 
         addrs.forEachIndexed { index, addr ->
-            if (index == 1) { sb.append("\n") } else if (index > 1) { sb.append(" · ") }
+            if (index == 1) {
+                sb.append("\n")
+            } else if (index > 1) {
+                sb.append(" · ")
+            }
 
             val start = sb.length
             sb.append(addr.trim())
             val end = sb.length
 
-            sb.setSpan(
-                TypefaceSpan("monospace"),
-                start,
-                end,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
-            sb.setSpan(
-                RelativeSizeSpan(1.07f),
-                start,
-                end,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-            )
+            sb.setSpan(TypefaceSpan("monospace"), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(RelativeSizeSpan(1.07f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         return sb
@@ -452,7 +437,6 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         fun styleLabel(start: Int, end: Int) {
             sb.setSpan(ForegroundColorSpan(labelColor), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             sb.setSpan(RelativeSizeSpan(0.80f), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            sb.setSpan(StyleSpan(Typeface.BOLD), start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         fun appendLine(label: String, value: String) {
@@ -461,16 +445,18 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             val ls = sb.length
             sb.append(label)
             styleLabel(ls, sb.length)
-            sb.append("  $value")
+            val vs = sb.length
+            sb.append(value)
+            sb.setSpan(TypefaceSpan("monospace"), vs, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            sb.setSpan(RelativeSizeSpan(1.07f), vs, sb.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
         // ip
         val ipStart = 0
         sb.append(meta.ip ?: "")
         val ipEnd = sb.length
-        sb.setSpan(StyleSpan(Typeface.BOLD),  ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         sb.setSpan(TypefaceSpan("monospace"), ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-        sb.setSpan(RelativeSizeSpan(1.07f),   ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        sb.setSpan(RelativeSizeSpan(1.07f), ipStart, ipEnd, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
 
         // asn
         val asnParts = buildList {
@@ -481,17 +467,17 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             if (org.isNotBlank()) add(org)
             if (dom.isNotBlank()) add(dom)
         }
-        if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString("  ·  "))
+        if (asnParts.isNotEmpty()) appendLine("", asnParts.joinToString(" · "))
 
         // loc, do not show client location for now as it is confusing
-        /*val locParts = buildList {
+        /* val locParts = buildList {
             val city = meta.city ?: ""
             val lat = meta.lat
             val lon = meta.lon
             if (city.isNotBlank()) add(city)
             if (lat != 0.0 || lon != 0.0) add(String.format(Locale.US, "%.4f°, %.4f°", lat, lon))
         }
-        if (locParts.isNotEmpty()) appendLine("LOC", locParts.joinToString("  ·  "))*/
+        if (asnParts.isNotEmpty()) appendLine("ASN", asnParts.joinToString(" · ")) */
 
         return sb
     }
@@ -533,7 +519,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         val stats = VpnController.getProxyStats(pid)
         val config = countryConfig
         // Use the time when this server key was selected by the user, not the VPN uptime.
-        val selectedSinceTs = RpnProxyManager.getSelectedSinceTs(id)
+        val selectedSinceTs = stats?.since ?: 0L
 
         uiCtx {
             applyStats(statusPair, stats, config, selectedSinceTs)
@@ -576,7 +562,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         else getString(R.string.lbl_never)
 
         val lastOpen = stats?.lastOpen ?: 0L
-        b.valueLastOpen.text = if (lastOK > 0L)
+        b.valueLastOpen.text = if (lastOpen > 0L)
             DateUtils.getRelativeTimeSpanString(
                 lastOpen, System.currentTimeMillis(),
                 DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
@@ -1081,13 +1067,24 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         updateErrorLayouts(hasPermissions, isLocationEnabled, permissionErrorLayout, locationErrorLayout)
 
         sw.setOnCheckedChangeListener { _, isChecked ->
-            val currentHasPermissions = SsidPermissionManager.hasRequiredPermissions(this)
+            val hasForeground = SsidPermissionManager.hasForegroundPermissions(this)
+            val hasBackground = SsidPermissionManager.hasBackgroundLocationPermission(this)
             val currentLocationEnabled = SsidPermissionManager.isLocationEnabled(this)
 
-            if (isChecked && !currentHasPermissions) {
-                SsidPermissionManager.checkAndRequestPermissions(this, ssidPermissionCallback)
-                Logger.d(LOG_TAG_UI, "SSID permissions not granted, requesting...")
-                return@setOnCheckedChangeListener
+            if (isChecked) {
+                if (!hasForeground) {
+                    showLocationDisclosureDialog {
+                        SsidPermissionManager.requestSsidPermissions(this@RpnConfigDetailActivity)
+                    }
+                    Logger.d(LOG_TAG_UI, "SSID foreground permissions not granted, requesting...")
+                    return@setOnCheckedChangeListener
+                } else if (isAtleastQ() && !hasBackground) {
+                    showLocationDisclosureDialog {
+                        SsidPermissionManager.requestBackgroundLocationPermission(this@RpnConfigDetailActivity)
+                    }
+                    Logger.d(LOG_TAG_UI, "SSID background permissions not granted, requesting...")
+                    return@setOnCheckedChangeListener
+                }
             }
 
             if (isChecked && !currentLocationEnabled) {
@@ -1099,7 +1096,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             // Persist the new state
             io { RpnProxyManager.updateSsidBased(configKey, isChecked) }
 
-            if (isChecked && currentHasPermissions && currentLocationEnabled) {
+            if (isChecked && SsidPermissionManager.hasRequiredPermissions(this) && currentLocationEnabled) {
                 if (persistentState.enableStabilityDependentSettings()) {
                     SnackbarHelper.showStabilityProgram(b.root, persistentState)
                 }
@@ -1126,7 +1123,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
                 Logger.i(LOG_TAG_UI, "SSID feature disabled for configKey: $configKey")
             }
 
-            updateErrorLayouts(currentHasPermissions, currentLocationEnabled, permissionErrorLayout, locationErrorLayout)
+            updateErrorLayouts(SsidPermissionManager.hasRequiredPermissions(this), currentLocationEnabled, permissionErrorLayout, locationErrorLayout)
         }
 
         layout.setOnClickListener { sw.performClick() }
@@ -1227,32 +1224,31 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         dlg.show()
     }
 
-    private fun showLocationEnableDialog() {
-        MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
-            .setTitle(getString(R.string.ssid_location_error))
-            .setMessage(getString(R.string.location_enable_explanation, getString(R.string.lbl_ssids)))
-            .setCancelable(true)
-            .setPositiveButton(getString(R.string.ssid_location_error_action)) { dlg, _ ->
-                SsidPermissionManager.requestLocationEnable(this); dlg.dismiss()
-            }
-            .setNegativeButton(getString(R.string.lbl_cancel)) { _, _ ->
-                b.ssidCheck.isChecked = false
-                io {
-                    RpnProxyManager.updateSsidBased(configKey, false)
-                }
-            }
-            .create().show()
+    private fun showLocationDisclosureDialog(onContinue: () -> Unit) {
+        val builder = MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
+        builder.setTitle(getString(R.string.location_disclosure_title))
+        builder.setMessage(getString(R.string.location_disclosure_message))
+        builder.setCancelable(true)
+        builder.setPositiveButton(getString(R.string.location_disclosure_positive)) { dialog, _ ->
+            onContinue()
+            dialog.dismiss()
+        }
+        builder.setNegativeButton(getString(R.string.location_disclosure_negative)) { _, _ ->
+            b.ssidCheck.isChecked = false
+            io { RpnProxyManager.updateSsidBased(configKey, false) }
+        }
+        builder.create().show()
     }
 
-    private fun showSsidPermissionExplanationDialog() {
+    private fun showLocationEnableDialog() {
         MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
-            .setTitle(getString(R.string.ssid_permission_error_action))
-            .setMessage(getString(R.string.ssid_permission_explanation, getString(R.string.lbl_ssids)))
+            .setTitle(getString(R.string.location_disclosure_title))
+            .setMessage(getString(R.string.location_disclosure_message))
             .setCancelable(true)
-            .setPositiveButton(getString(R.string.ssid_permission_error_action)) { dlg, _ ->
-                SsidPermissionManager.requestSsidPermissions(this); dlg.dismiss()
+            .setPositiveButton(getString(R.string.location_disclosure_positive)) { dlg, _ ->
+                SsidPermissionManager.requestLocationEnable(this); dlg.dismiss()
             }
-            .setNegativeButton(getString(R.string.lbl_cancel)) { _, _ ->
+            .setNegativeButton(getString(R.string.location_disclosure_negative)) { _, _ ->
                 b.ssidCheck.isChecked = false
                 io {
                     RpnProxyManager.updateSsidBased(configKey, false)

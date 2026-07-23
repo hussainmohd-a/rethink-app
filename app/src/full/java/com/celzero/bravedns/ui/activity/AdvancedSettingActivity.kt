@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.ui.activity
 
-import Logger
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
@@ -66,7 +66,7 @@ class AdvancedSettingActivity : BaseActivity(R.layout.activity_advanced_setting)
             b.settingsAutoDialRl.visibility = View.VISIBLE
             b.dvAutoDialSwitch.isChecked = persistentState.autoDialsParallel
             b.settingsResetTourRl.visibility = View.VISIBLE
-            b.dvPtModeSwitch.isChecked = persistentState.advSettingForcePTMode
+            b.dvPtModeSwitch.isChecked = !persistentState.advSettingForcePTMode
             b.settingsPtModeRl.visibility = View.VISIBLE
             b.settingsGoMaxMemoryLl.visibility = View.VISIBLE
             val maxMemMb = (persistentState.goMaxMemory / (1024 * 1024)).toInt()

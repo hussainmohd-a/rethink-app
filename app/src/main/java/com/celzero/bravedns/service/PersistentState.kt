@@ -408,19 +408,15 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     // 0 - auto, 1 - relaxed, 2 - aggressive, 3 - fixed
     var vpnBuilderPolicy by intPref("tun_network_handling_policy").withDefault<Int>(0)
 
-    // whether to use default dns for trusted ips and domains
-    // TODO: remove this variable as it should not be used, BlockFreeDnsMode should be used instead
-    //  to decide the dns bypass mode for trusted ips and domains
-    var useFallbackDnsToBypass by booleanPref("use_fallback_dns_to_bypass").withDefault<Boolean>(true)
-
     // Block-free DNS: stored as "TYPE::url" e.g. "DOH::https://dns.google/dns-query"
     // Empty string means no block-free DNS configured
     var blockFreeDns by stringPref("block_free_dns").withDefault<String>("")
 
     // DNS bypass mode for block-free DNS: 1=fallback, 2=global, 3=auto
-    // Default is 3 (auto) which means use dns will be decided based on other dns settings
+    // Default is FALLBACK on Android < 11 (API < 30), AUTO on Android 11+
     var blockFreeDnsMode by intPref("block_free_dns_mode").withDefault<Int>(
-        BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.AUTO.mode)
+        if (isAtleastR()) BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.AUTO.mode
+        else BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.FALLBACK.mode)
 
     // Firebase error reporting enabled (only for play and website variants)
     var firebaseErrorReportingEnabled by booleanPref("firebase_error_reporting").withDefault<Boolean>(Utilities.isPlayStoreFlavour())
@@ -711,7 +707,7 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
         }.toSet()
     }
 
-    // SE Proxy for Anti-Censorship
+    // Anti-censor: true when DialStrategies.TCP_PROXY and RetryStrategies.Retry is set to NEVER
     var autoProxyEnabled by booleanPref(AUTO_PROXY_ENABLED).withDefault<Boolean>(false)
 
     // Custom LAN IP configuration mode: 0 = AUTO (default), 1 = MANUAL

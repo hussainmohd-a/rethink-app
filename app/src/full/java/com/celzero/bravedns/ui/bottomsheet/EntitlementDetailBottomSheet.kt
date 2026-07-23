@@ -106,7 +106,7 @@ class EntitlementDetailBottomSheet : BottomSheetDialogFragment() {
         setupRow(b.rowWho, "Identifier (WHO)", who)
         setupRow(b.rowExpiry, "Expiry", UIUtils.formatToRelativeTime(requireContext(), entitlement.expiry()))
         setupRow(b.rowProvider, "Provider ID", entitlement.providerID())
-        setupRow(b.rowToken, "Token", entitlement.token())
+        setupRow(b.rowToken, "Token", entitlement.token().take(4) + "..." + entitlement.token().takeLast(4))
         setupRow(b.rowAllowRestore, "Allow Restore", entitlement.allowRestore().toString().capitalizeWords())
         setupRow(b.rowTest, "Is Test", entitlement.test().toString().capitalizeWords(), showDivider = false)
     }

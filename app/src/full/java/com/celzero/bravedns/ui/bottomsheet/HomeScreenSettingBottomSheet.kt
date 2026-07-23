@@ -15,9 +15,9 @@
  */
 package com.celzero.bravedns.ui.bottomsheet
 
-import Logger
-import Logger.LOG_TAG_UI
-import Logger.LOG_TAG_VPN
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
@@ -202,7 +202,7 @@ class HomeScreenSettingBottomSheet : BottomSheetDialogFragment() {
     // disable dns and firewall mode, show user that vpn in lockdown mode indicator if needed
     private fun handleLockdownModeIfNeeded() {
         val isLockdown = VpnController.isVpnLockdown()
-        val isProxyEnabled = appConfig.isProxyEnabled()
+        val isProxyEnabled = appConfig.isProxyEnabled() || RpnProxyManager.isRpnActive()
         if (isLockdown) {
             b.bsHomeScreenVpnLockdownDesc.text = htmlToSpannedText(getString(R.string.hs_btm_sheet_lock_down))
             b.bsHomeScreenVpnLockdownDesc.visibility = View.VISIBLE

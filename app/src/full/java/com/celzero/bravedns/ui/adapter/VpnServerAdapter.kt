@@ -15,8 +15,8 @@
  */
 package com.celzero.bravedns.ui.adapter
 
-import Logger
-import Logger.LOG_TAG_UI
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_UI
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
 import android.content.Context
@@ -147,7 +147,7 @@ class VpnServerAdapter(
 
         fun getBestServer(): CountryConfig = servers.minByOrNull { it.load } ?: servers.first()
 
-        fun proxyId(): String = if (key.equals(AUTO_SERVER_ID, true)) "${Backend.RpnWin}**" else Backend.RpnWin + key
+        fun proxyId(): String = if (key.equals(AUTO_SERVER_ID, true)) Backend.RpnWin else Backend.RpnWin + key
     }
 
     interface ServerSelectionListener {
@@ -298,6 +298,7 @@ class VpnServerAdapter(
                 b.serverCard.setOnClickListener { openServerDetail(group.getBestServer()) }
                 // Always start polling
                 statsJob = pollStatsLoop(group)
+                handleIpView(group)
             } else {
                 b.refreshStopIcon.setOnClickListener {
                     handleRefreshClick(group)
@@ -307,6 +308,22 @@ class VpnServerAdapter(
                 // Show "Checking…" immediately so the item is never left stranded
                 showCheckingStatus()
                 statsJob = pollStatsLoop(group)
+                handleIpView(group)
+            }
+        }
+
+        private fun handleIpView(group: ServerGroup) {
+            io {
+                // Fetch IP metadata for this server
+                val ip4 = fetchIpForGroup(group)
+                uiCtx {
+                    // Server IP row.
+                    // Show the actual IP label when available, fall back to "N/A"
+                    val ipText = ip4?.ip?.takeIf { it.isNotEmpty() }
+                    b.tvCcSep.visibility = View.VISIBLE
+                    b.tvServerIp.text = ipText ?: "N/A"
+                    b.tvServerIp.visibility = View.VISIBLE
+                }
             }
         }
 
@@ -441,14 +458,11 @@ class VpnServerAdapter(
                 val statusPair = VpnController.getProxyStatusById(id)
                 val stats = VpnController.getProxyStats(id)
 
-                // Fetch IP metadata for this server
-                val ip4 = fetchIpForGroup(group)
-
                 Logger.v(LOG_TAG_UI, "VpnServerAdapter fetchAndApplyStats for id: $id, config: $config, status: $statusPair, stats: $stats")
                 uiCtx {
                     if (!b.root.isAttachedToWindow) return@uiCtx
 
-                    applyStats(config, statusPair, stats, ip4)
+                    applyStats(config, statusPair, stats)
                 }
             } catch (t: Throwable) {
                 Logger.w(LOG_TAG_UI, "VpnServerAdapter fetchAndApplyStats[${group.key}]: ${t.message}")
@@ -507,8 +521,7 @@ class VpnServerAdapter(
         private fun applyStats(
             config: CountryConfig?,
             statusPair: Pair<Int?, String>,
-            stats: RouterStats?,
-            ip4: IPMetadata? = null
+            stats: RouterStats?
         ) {
             if (config == null) {
                 hideStats()
@@ -526,20 +539,13 @@ class VpnServerAdapter(
             b.tvServerStatus.setTextColor(fetchColor(ctx, getStatusColor(status)))
 
             // Uptime
-            val uptime = getUpTime(config.key)
+            val uptime = getUpTime(stats)
             b.tvUptimeSep.visibility = if (uptime.isNotEmpty()) View.VISIBLE else View.GONE
             b.tvUptime.visibility = if (uptime.isNotEmpty()) View.VISIBLE else View.GONE
             if (uptime.isNotEmpty()) b.tvUptime.text = uptime
 
-            // Server IP row.
-            // Show the actual IP label when available, fall back to "N/A"
-            val ipText = ip4?.ip?.takeIf { it.isNotEmpty() }
+
             when {
-                ipText != null -> {
-                    b.tvCcSep.visibility = View.VISIBLE
-                    b.tvServerIp.text = ipText
-                    b.tvServerIp.visibility = View.VISIBLE
-                }
                 stats != null -> {
                     // Tunnel is up and returning stats but the IP metadata isn't available
                     // yet (or the backend didn't return one), show "N/A" so the row is
@@ -600,8 +606,8 @@ class VpnServerAdapter(
                 .replaceFirstChar(Char::titlecase)
         }
 
-        private fun getUpTime(id: String): CharSequence {
-            val selectedSinceTs = RpnProxyManager.getSelectedSinceTs(id)
+        private fun getUpTime(stats: RouterStats?): CharSequence {
+            val selectedSinceTs = stats?.since ?: 0L
             return if (selectedSinceTs > 0L)
                 DateUtils.getRelativeTimeSpanString(
                     selectedSinceTs, System.currentTimeMillis(),

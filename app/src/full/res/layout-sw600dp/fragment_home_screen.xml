@@ -44,16 +44,25 @@
                     android:textStyle="bold"
                     android:textSize="22sp" />
 
-                <androidx.appcompat.widget.AppCompatImageView
-                    android:id="@+id/fhs_sponsor"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_centerVertical="true"
-                    android:layout_toEndOf="@id/fhs_title_rethink"
-                    android:alpha="0.5"
-                    android:background="?android:attr/selectableItemBackground"
-                    android:padding="12dp"
-                    android:src="@drawable/ic_heart_accent" />
+            <androidx.appcompat.widget.AppCompatImageView
+                android:id="@+id/fhs_sponsor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginStart="8dp"
+                android:layout_toEndOf="@id/fhs_title_rethink"
+                android:alpha="0.5"
+                android:background="?android:attr/selectableItemBackground"
+                android:padding="10dp"
+                android:src="@drawable/ic_heart_accent" />
+
+            <com.celzero.bravedns.sponsor.ui.SponsorBadgeView
+                android:id="@+id/fhs_sponsor_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toEndOf="@id/fhs_sponsor"
+                android:visibility="gone" />
 
             </RelativeLayout>
 

@@ -15,10 +15,10 @@
  */
 package com.celzero.bravedns.service
 
-import Logger
-import Logger.LOG_GO_LOGGER
-import Logger.LOG_TAG_BUG_REPORT
-import Logger.LOG_TAG_VPN
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_GO_LOGGER
+import com.celzero.bravedns.util.Logger.LOG_TAG_BUG_REPORT
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
