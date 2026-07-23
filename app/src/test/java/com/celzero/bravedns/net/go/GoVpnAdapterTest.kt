@@ -375,8 +375,6 @@ class GoVpnAdapterTest : KoinTest {
         adapter.unregisterWin()
         adapter.setRpnAutoMode()
         adapter.isRpnReachable("1.1.1.1:53")
-        adapter.registerSeProxyIfNeeded()
-        adapter.unregisterSeProxyIfNeeded()
         adapter.setExperimentalWireGuardSettings()
         adapter.setAutoDialsParallel()
         adapter.setAutoMode()
