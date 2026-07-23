@@ -16,7 +16,7 @@
 @file:Suppress("DEPRECATION")
 package com.celzero.bravedns.service
 
-import Logger
+import com.celzero.bravedns.util.Logger
 import android.content.Context
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.UserNotAuthenticatedException
@@ -76,6 +76,10 @@ object EncryptedFileManager : KoinComponent {
     // (KEYSET_PREF_NAME and KEYSET_ALIAS) used via AndroidKeysetManager.
     private const val TINK_KEYSET_PREF_NAME = "__androidx_security_crypto_encrypted_file_pref__"
     private const val TINK_KEYSET_KEY = "__androidx_security_crypto_encrypted_file_keyset__"
+
+    // Suffix used for the temp-file fallback when a target cannot be deleted in place
+    // (see [write] / [writeViaTempFile]).
+    private const val TEMP_FILE_SUFFIX = ".write.tmp"
 
     // Inject EventLogger for critical failure logging
     private val eventLogger by inject<EventLogger>()
@@ -244,8 +248,12 @@ object EncryptedFileManager : KoinComponent {
     /**
      * Writes ByteArray data to encrypted file.
      *
-     * The old encrypted data is permanently lost, but the alternative is a permanent
-     * brick where *all* encrypted-file operations fail until the user clears app data.
+     * androidx.security.crypto.EncryptedFile is *write-once*: [EncryptedFile.openFileOutput]
+     * throws "output file already exists" if the target is already present. So any existing
+     * file is deleted first (verified), and if that delete cannot take effect - e.g. an old
+     * file lingering after a restore on external/FUSE storage - the write falls back to a
+     * fresh temp file that is then atomically renamed over the target, guaranteeing the old
+     * contents are replaced with the new ones.
      *
      * @throws EncryptionException.KeyInvalidated if encryption key was invalidated
      * @throws EncryptionException.AuthRequired if authentication is required
@@ -254,26 +262,117 @@ object EncryptedFileManager : KoinComponent {
      */
     @Throws(EncryptionException::class)
     fun write(ctx: Context, data: ByteArray, file: File): Boolean {
-        try {
-            Logger.d(LOG_TAG, "write into $file")
-            if (file.exists()) file.delete()
-            return writeInternal(ctx, data, file)
+        Logger.d(LOG_TAG, "write into ${file.absolutePath}")
+        return try {
+            // Delete any existing file first; EncryptedFile refuses to overwrite it.
+            deleteFile(file)
+            writeInternal(ctx, data, file)
         } catch (e: Exception) {
-            // Check if this is a recoverable keyset-corruption error.
-            // AEADBadTagException happens inside EncryptedFile.Builder.build()
+            // The prior delete did not take effect (silent File.delete() failure on
+            // external/FUSE storage). Replace the target via temp-file + atomic rename.
+            if (isOutputFileAlreadyExists(e)) {
+                Logger.w(LOG_TAG, "Target still exists after delete for ${file.absolutePath}; " +
+                        "using temp-file rename fallback to replace it", e)
+                return writeViaTempFile(ctx, data, file)
+            }
+            // Recoverable keyset-corruption error. AEADBadTagException happens inside
+            // EncryptedFile.Builder.build(); reset the keyset and retry the write.
             if (isKeysetCorruption(e)) {
-                Logger.w(LOG_TAG, "Keyset corruption detected for ${file.absolutePath}, " +
-                        "clearing corrupted state and retrying write", e)
-                destroyCorruptedKeyset(ctx)
-                try {
-                    return writeInternal(ctx, data, file)
-                } catch (retryEx: Exception) {
-                    Logger.e(LOG_TAG, "Retry after keyset reset also failed for ${file.absolutePath}", retryEx)
-                    throw handleCriticalException(retryEx, "Write file (retry)", file.absolutePath)
-                }
+                return resetKeysetAndWrite(ctx, data, file)
             }
             throw handleCriticalException(e, "Write file", file.absolutePath)
         }
+    }
+
+    /**
+     * Best-effort, *verified* deletion of [file]. [File.delete] only returns a boolean and
+     * never throws, so the result must be checked; directories need [File.deleteRecursively].
+     * Returns true when the file is gone afterwards.
+     */
+    private fun deleteFile(file: File): Boolean {
+        if (!file.exists()) return true
+        if (file.delete()) return true
+        if (file.isDirectory && file.deleteRecursively()) return true
+        // One more attempt - the first failure is sometimes transient on FUSE storage.
+        if (file.delete()) return true
+        val gone = !file.exists()
+        if (!gone) {
+            Logger.w(LOG_TAG, "Unable to delete existing file: ${file.absolutePath}")
+        }
+        return gone
+    }
+
+    /**
+     * Writes [data] to a fresh temporary file, then atomically renames it over [file]. This
+     * replaces a pre-existing [file] that [EncryptedFile] refuses to overwrite and that
+     * [deleteFile] could not remove in place. The temp file is written by the same shared
+     * keyset, so the renamed file remains a valid encrypted file.
+     */
+    private fun writeViaTempFile(ctx: Context, data: ByteArray, file: File): Boolean {
+        val parent = file.parentFile
+        if (parent == null || (!parent.exists() && !parent.mkdirs())) {
+            throw EncryptionException.IOError(
+                java.io.IOException("Cannot access parent dir for temp write: ${file.parent}")
+            )
+        }
+        val temp = File(parent, file.name + TEMP_FILE_SUFFIX)
+        // Clear any stale temp file left by a previously crashed attempt.
+        deleteFile(temp)
+        try {
+            writeInternal(ctx, data, temp)
+        } catch (e: Exception) {
+            deleteFile(temp)
+            // Keyset reset is handled by the caller; surface any other failure here.
+            throw handleCriticalException(e, "Write file (temp fallback)", file.absolutePath)
+        }
+
+        // Replace the existing target with the freshly written temp file.
+        deleteFile(file)
+        if (temp.renameTo(file)) return true
+        Logger.w(LOG_TAG, "First rename failed for ${file.absolutePath}; retrying after delete")
+        deleteFile(file)
+        if (temp.renameTo(file)) return true
+
+        // Could not replace the target; clean up the temp file and surface the failure.
+        deleteFile(temp)
+        throw EncryptionException.IOError(
+            java.io.IOException("Failed to replace file via temp rename: ${file.absolutePath}")
+        )
+    }
+
+    /**
+     * Clears a corrupted Tink keyset and retries the write to [file] with the fresh keyset.
+     */
+    private fun resetKeysetAndWrite(ctx: Context, data: ByteArray, file: File): Boolean {
+        Logger.w(LOG_TAG, "Keyset corruption detected for ${file.absolutePath}, " +
+                "clearing corrupted state and retrying write")
+        destroyCorruptedKeyset(ctx)
+        return try {
+            deleteFile(file)
+            writeInternal(ctx, data, file)
+        } catch (retryEx: Exception) {
+            Logger.e(LOG_TAG, "Retry after keyset reset also failed for ${file.absolutePath}", retryEx)
+            throw handleCriticalException(retryEx, "Write file (retry)", file.absolutePath)
+        }
+    }
+
+    /**
+     * Detects the "output file already exists" error thrown by [EncryptedFile.openFileOutput]
+     * when a target could not be removed prior to writing. Walks the cause chain since the
+     * library may wrap the exception.
+     */
+    private fun isOutputFileAlreadyExists(e: Throwable?): Boolean {
+        var current: Throwable? = e
+        while (current != null) {
+            if (current is java.io.IOException) {
+                val msg = current.message
+                if (msg != null && msg.contains("already exists")) {
+                    return true
+                }
+            }
+            current = current.cause
+        }
+        return false
     }
 
     /**
