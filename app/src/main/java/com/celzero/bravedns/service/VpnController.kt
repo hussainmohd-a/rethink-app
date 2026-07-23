@@ -16,8 +16,8 @@
  */
 package com.celzero.bravedns.service
 
-import Logger
-import Logger.LOG_TAG_VPN
+import com.celzero.bravedns.util.Logger
+import com.celzero.bravedns.util.Logger.LOG_TAG_VPN
 import android.content.Context
 import android.content.Intent
 import android.net.Network
@@ -70,8 +70,6 @@ object VpnController : KoinComponent {
     // into VpnController's state(), isOn(), hasTunnel() etc.
     var connectionStatus: MutableLiveData<BraveVPNService.State?> = MutableLiveData()
 
-    @Volatile private var isLastConnectionEch: Boolean = false
-
     // TODO: make clients listen on create, start, stop, destroy from vpn-service
     fun onVpnCreated(b: BraveVPNService) {
         rvpn = b
@@ -115,7 +113,6 @@ object VpnController : KoinComponent {
         externalScope = null
     }
 
-    @Suppress("DEPRECATION")
     fun uptimeMs(): Long {
         val b = rvpn
         val start = vpnStartElapsedTime
@@ -131,10 +128,6 @@ object VpnController : KoinComponent {
     fun onConnectionStateChanged(state: BraveVPNService.State?) {
         val s = states
         externalScope?.launch { s?.send(state) }
-    }
-
-    fun onEchUpdate(isEch: Boolean) {
-        isLastConnectionEch = isEch
     }
 
     private fun updateState(state: BraveVPNService.State?) {
@@ -188,9 +181,8 @@ object VpnController : KoinComponent {
         val requested: Boolean = persistentState.getVpnEnabled()
         val b = rvpn
         val cs = connectionState
-        val ech = isLastConnectionEch
         val on = b?.hasTunnel() == true
-        return VpnState(requested, on, cs, ech)
+        return VpnState(requested, on, cs)
     }
 
     @Deprecated(message = "use hasTunnel() instead", replaceWith = ReplaceWith("hasTunnel()"))
@@ -254,6 +246,10 @@ object VpnController : KoinComponent {
         return rvpn?.getProxyStatusById(id) ?: Pair(null, "vpn service not available")
     }
 
+    suspend fun getProxyAddrById(id: String): String? {
+        return rvpn?.getProxyAddrById(id)
+    }
+
     suspend fun getProxyStats(id: String): RouterStats? {
         return rvpn?.getProxyStats(id)
     }
@@ -262,8 +258,20 @@ object VpnController : KoinComponent {
         return rvpn?.getWireGuardStats(id)
     }
 
+    suspend fun getLocalProxyStatsById(id: String): ProxyManager.ProxyStats? {
+        return rvpn?.getLocalProxyStatsById(id)
+    }
+
+    suspend fun memProfile(filepath: String) {
+        rvpn?.memProfile(filepath)
+    }
+
     suspend fun getRpnStats(id: String): RpnProxyManager.RpnStats? {
         return rvpn?.getRpnStats(id)
+    }
+
+    suspend fun getDnsIps(id: String): String? {
+        return rvpn?.getDnsIps(id)
     }
 
     suspend fun getRpnAddlInfo(id: String): RpnProxyManager.ActiveRpnAddlInfo? {
