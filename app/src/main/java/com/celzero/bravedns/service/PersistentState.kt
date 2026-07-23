@@ -418,9 +418,10 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     var blockFreeDns by stringPref("block_free_dns").withDefault<String>("")
 
     // DNS bypass mode for block-free DNS: 1=fallback, 2=global, 3=auto
-    // Default is 3 (auto) which means use dns will be decided based on other dns settings
+    // Default is FALLBACK on Android < 11 (API < 30), AUTO on Android 11+
     var blockFreeDnsMode by intPref("block_free_dns_mode").withDefault<Int>(
-        BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.AUTO.mode)
+        if (isAtleastR()) BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.AUTO.mode
+        else BlockFreeDnsModeBottomSheet.BlockFreeDnsMode.FALLBACK.mode)
 
     // Firebase error reporting enabled (only for play and website variants)
     var firebaseErrorReportingEnabled by booleanPref("firebase_error_reporting").withDefault<Boolean>(Utilities.isPlayStoreFlavour())
@@ -711,7 +712,7 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
         }.toSet()
     }
 
-    // SE Proxy for Anti-Censorship
+    // Anti-censor: true when DialStrategies.TCP_PROXY and RetryStrategies.Retry is set to NEVER
     var autoProxyEnabled by booleanPref(AUTO_PROXY_ENABLED).withDefault<Boolean>(false)
 
     // Custom LAN IP configuration mode: 0 = AUTO (default), 1 = MANUAL
