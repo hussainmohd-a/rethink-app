@@ -1,7 +1,7 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    ext.kotlin_version = '2.3.21'
+    ext.kotlin_version = '2.4.10'
     repositories {
         google()
         // https://jfrog.com/blog/into-the-sunset-bintray-jcenter-gocenter-and-chartcenter/
@@ -9,7 +9,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:9.2.1'
+        classpath 'com.android.tools.build:gradle:9.3.1'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
         // rethink-tv: Compose Compiler plugin (bundled with Kotlin since 2.0).
         // Required by the `tv` flavor for Compose-for-TV UI; only applied in
@@ -37,7 +37,7 @@ buildscript {
 }
 
 plugins {
-    id 'com.google.devtools.ksp' version '2.3.9' apply false
+    id 'com.google.devtools.ksp' version '2.3.11' apply false
 }
 
 allprojects {
