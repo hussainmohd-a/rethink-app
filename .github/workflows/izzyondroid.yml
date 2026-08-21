@@ -1,0 +1,143 @@
+name: Build IzzyOnDroid
+
+on:
+  push:
+    tags:
+      - 'v*' # Run when a tag beginning with v is pushed.
+
+  # Allow the workflow to be started manually
+  # workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: IzzyOnDroid
+    runs-on: ubuntu-latest
+
+    env:
+      IZZY_BUILD_VARIANT: "assembleFdroidFullRelease"
+      IZZY_BUILD_OUT: "./app/build/outputs/apk/**/*.apk"
+
+    steps:
+      # source code.
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      # Java 17 required to build the app
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # IzzyOnDroid signing keystore (encrypted)
+      - name: Keystore
+        run: |
+          echo "${{ secrets.IZZYONDROID_KS_ASC }}" > rethink-izzyondroid.jks.asc
+
+          gpg -d \
+            --passphrase "${{ secrets.IZZYONDROID_KS_PASSPHRASE }}" \
+            --batch \
+            rethink-izzyondroid.jks.asc > app/rethinkIzzyOnDroid.jks
+
+          wc -wcl \
+            rethink-izzyondroid.jks.asc \
+            app/rethinkIzzyOnDroid.jks
+
+      # Build the F-Droid variant using the IzzyOnDroid signing key
+      - name: Build
+        run: |
+          ./gradlew ${IZZY_BUILD_VARIANT} -PwebsiteDegoogled=true --info --warning-mode all
+        env:
+          IZZYONDROID_KS_ALIAS: ${{ vars.IZZYONDROID_KS_ALIAS }}
+          IZZYONDROID_KS_FILE: rethinkIzzyOnDroid.jks
+          IZZYONDROID_KS_PASSWORD: ${{ secrets.IZZYONDROID_KS_PASSWORD }}
+
+      # Find the APK generated
+      - name: Find
+        run: |
+          find "$PWD" -type f -iname '*.apk'
+
+          APKFILE=$(find app/build/outputs/apk -type f -name '*.apk' | head -n 1)
+
+          if [ -z "$APKFILE" ]; then
+            echo "::error::APK not found"
+            exit 1
+          fi
+
+          echo "APKFILE=$APKFILE" >> "$GITHUB_ENV"
+          echo "APK found:"
+          echo "$APKFILE"
+
+      # Rename the generated APKs to the IzzyOnDroid naming convention.
+      - name: Rename APKs
+        run: |
+          mkdir -p izzy-release
+
+          find app/build/outputs/apk -type f -name '*.apk' -print0 | while IFS= read -r -d '' apk; do
+          filename=$(basename "$apk")
+
+          case "$filename" in
+            *arm64-v8a*)
+              abi="arm64-v8a"
+              ;;
+            *armeabi-v7a*)
+              abi="armeabi-v7a"
+              ;;
+            *x86_64*)
+              abi="x86_64"
+              ;;
+            *x86*)
+              abi="x86"
+              ;;
+            *universal*)
+              abi="universal"
+              ;;
+            *)
+              echo "Unknown APK: $filename"
+              exit 1
+              ;;
+          esac
+          
+          new_name="rethink-${GITHUB_REF_NAME}-izzy-${abi}.apk"
+
+          echo "$filename -> $new_name"
+
+          cp "$apk" "izzy-release/$new_name"
+        
+          done
+
+          echo "Generated IzzyOnDroid APKs:"
+          ls -lh izzy-release/
+
+      # Upload the APKs as a GitHub Actions artifact.
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: rethink-${{ github.ref_name }}-izzy
+          path: izzy-release/*.apk
+          if-no-files-found: error
+          retention-days: 72
+          compression-level: 9
+
+      # Create a draft GitHub release and attach the APKs.
+      - name: Create draft release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }} - IzzyOnDroid
+          draft: true
+          prerelease: false
+          files: izzy-release/*.apk
+          fail_on_unmatched_files: true
+
+      # Remove the temporary signing keystore from the runner.
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f app/rethinkIzzyOnDroid.jks
+          rm -f rethink-izzyondroid.jks.asc

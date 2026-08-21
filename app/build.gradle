@@ -170,7 +170,7 @@ android {
         }
         izzyondroid {
             keyAlias System.getenv("IZZYONDROID_KS_ALIAS")
-            keyPassword System.getenv("IZZYONDROID_KS_KEY_PASSWORD")
+            keyPassword System.getenv("IZZYONDROID_KS_PASSWORD")
             storeFile file(String.valueOf(System.getenv("IZZYONDROID_KS_FILE")))
             storePassword System.getenv("IZZYONDROID_KS_PASSWORD")
         }
@@ -247,8 +247,10 @@ android {
                 }
             }
             if (isWebsiteDegoogled) {
+                println("IzzyOnDroid build: using izzyondroid signing config")
                 signingConfig signingConfigs.izzyondroid
             } else {
+                println("Normal build: using config signing config")
                 signingConfig signingConfigs.config
             }
         }
