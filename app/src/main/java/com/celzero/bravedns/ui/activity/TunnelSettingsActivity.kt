@@ -280,10 +280,6 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
             _: CompoundButton,
             bool: Boolean ->
             persistentState.useMultipleNetworks = bool
-            if (!bool && persistentState.routeRethinkInRethink) {
-                persistentState.routeRethinkInRethink = false
-                displayRethinkInRethinkUi()
-            }
             logEvent(
                 "use all networks",
                 "Use all networks for VPN: $bool"
@@ -321,10 +317,6 @@ class TunnelSettingsActivity : BaseActivity(R.layout.activity_tunnel_settings) {
                     val rethinkUid = android.os.Process.myUid()
                     io {
                         FirewallManager.exemptRethinkApp(rethinkUid)
-                    }
-                    if (!persistentState.useMultipleNetworks) {
-                        b.settingsActivityAllNetworkSwitch.isChecked = true
-                        persistentState.useMultipleNetworks = true
                     }
                     persistentState.routeRethinkInRethink = true
                     logEvent(
