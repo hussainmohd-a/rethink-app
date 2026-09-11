@@ -209,7 +209,6 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="12dp"
-                                android:background="@drawable/bg_heatmap_surface"
                                 android:paddingStart="10dp"
                                 android:paddingTop="8dp"
                                 android:paddingEnd="10dp"
@@ -977,17 +976,16 @@
 
                         <FrameLayout
                             android:id="@+id/error_icon_container"
-                            android:layout_width="96dp"
-                            android:layout_height="96dp"
-                            android:background="@drawable/bg_error_icon_circle">
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content">
 
                             <androidx.appcompat.widget.AppCompatImageView
                                 android:id="@+id/error_illustration"
-                                android:layout_width="44dp"
-                                android:layout_height="44dp"
+                                android:layout_width="88dp"
+                                android:layout_height="64dp"
                                 android:layout_gravity="center"
-                                android:src="@drawable/illustrations_no_record"
-                                android:tint="?attr/accentBad" />
+                                android:src="@drawable/dolphin_sad_1"
+                                android:contentDescription="@string/server_selection_error_title" />
 
                         </FrameLayout>
 

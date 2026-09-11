@@ -706,17 +706,8 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         // Use the time when this server key was selected by the user, not the VPN uptime.
         val selectedSinceTs = stats?.since ?: 0L
 
-        // when Auto is paused the relay is effectively paused too, regardless of this
-        // location's own state
-        var isAutoPaused = false
-        if (!id.contains(AUTO_SERVER_ID, ignoreCase = true) && config?.hopEnabled == true) {
-            isAutoPaused = runCatching {
-                VpnController.getProxyStatusById(Backend.RpnWin).first == Backend.TPU
-            }.getOrDefault(false)
-        }
-
         uiCtx {
-            applyStats(statusPair, stats, config, selectedSinceTs, isAutoPaused)
+            applyStats(statusPair, stats, config, selectedSinceTs)
         }
     }
 
@@ -731,15 +722,10 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         statusPair: Pair<Int?, String>,
         stats: RouterStats?,
         config: CountryConfig?,
-        selectedSinceTs: Long,
-        isAutoPaused: Boolean = false
+        selectedSinceTs: Long
     ) {
         val ps = UIUtils.ProxyStatus.entries.find { it.id == statusPair.first }
-        // Paused override (same as VpnServerAdapter): a relayed (hop) location
-        // whose AUTO is paused shows "Paused" even when it reports failing.
-        val effectiveStatus =
-            if (isAutoPaused && ps != UIUtils.ProxyStatus.TPU) UIUtils.ProxyStatus.TPU else ps
-        val statusColor = fetchColor(this, buildStatusColor(effectiveStatus))
+        val statusColor = fetchColor(this, buildStatusColor(ps))
 
         b.valueStatus.text = getString(R.string.lbl_active)
 
@@ -751,7 +737,7 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
         b.valueTx.text = getString(R.string.symbol_upload, Utilities.humanReadableByteCount(tx, true))
 
         // e.g. "Connected · 🤝 1m · 🔃 12m"
-        val statusText = buildStatusText(effectiveStatus, statusPair.second)
+        val statusText = buildStatusText(ps, statusPair.second)
         val lastOK = stats?.lastOK ?: 0L
         val lastOpen = stats?.lastOpen ?: 0L
         val okTxt = if (lastOK > 0L)
@@ -805,9 +791,9 @@ class RpnConfigDetailActivity : BaseActivity(R.layout.activity_rpn_config_detail
             buildLoadSpeedText(loadPct, linkMbps)
         }
 
-        // only shown when proxy is in a failing state (suppressed while the
-        // paused override is active — a relay paused via AUTO is not an error).
-        val isFailing = isFailing(effectiveStatus)
+        // only shown when proxy is in a failing state (a paused proxy reports TPU,
+        // which is not a failure, so the row stays hidden for it).
+        val isFailing = isFailing(ps)
         if (isFailing && (rx == 0L && tx == 0L && selectedSinceTs > 0L)) {
             b.rowErrors.visibility = View.VISIBLE
             b.dividerErrors.visibility = View.VISIBLE

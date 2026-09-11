@@ -217,6 +217,7 @@ class RpnStatsBottomSheet : BaseBottomSheetDialogFragment() {
         if (!isAdded) return
         val proxyId = Backend.RpnWin
         if (proxyId.isBlank()) {
+            b.dolphinSignature.setContentForFailure()
             Utilities.showToastUiCentered(
                 requireContext(),
                 getString(R.string.rpn_stats_no_active_proxy),

@@ -351,6 +351,9 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
                             when (state.result) {
                                 is RpnProxyManager.ResetResult.Success -> {
                                     Logger.i(LOG_TAG_UI, "$TAG.observeResetState: reset success")
+                                    // Reset worked; recover the signature if a
+                                    // previous failure flipped it to a sad dolphin.
+                                    b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
                                     showToastUiCentered(
                                         requireContext(),
                                         getString(R.string.rpn_restore_success),
@@ -359,6 +362,7 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
                                 }
                                 is RpnProxyManager.ResetResult.Failure -> {
                                     Logger.w(LOG_TAG_UI, "$TAG.observeResetState: reset failed: ${state.result.reason}")
+                                    b.dolphinSignature.setContentForFailure()
                                     showToastUiCentered(
                                         requireContext(),
                                         getString(R.string.rpn_restore_failure, state.result.reason),
@@ -372,6 +376,7 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
                         is ServerSelectionViewModel.ResetState.NoTunnel -> {
                             serverSelectionViewModel.onResetConsumed()
                             dismissRpnResetDialog()
+                            b.dolphinSignature.setContentForFailure()
                             showToastUiCentered(
                                 requireContext(),
                                 getString(R.string.ssv_toast_start_rethink),
@@ -508,11 +513,14 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
                 is ServerApiError.Unauthorized401 -> showDeviceAuthErrorBottomSheet(error)
                 is ServerApiError.DeviceNotRegistered -> showDeviceNotRegisteredBottomSheet(error)
                 is ServerApiError.GenericError -> showToastUiCentered(requireContext(), error.message, Toast.LENGTH_LONG)
-                is ServerApiError.NetworkError -> showToastUiCentered(
-                    requireContext(),
-                    error.message ?: getString(R.string.subscription_action_failed),
-                    Toast.LENGTH_LONG
-                )
+                is ServerApiError.NetworkError -> {
+                    b.dolphinSignature.setContentForFailure()
+                    showToastUiCentered(
+                        requireContext(),
+                        error.message ?: getString(R.string.subscription_action_failed),
+                        Toast.LENGTH_LONG
+                    )
+                }
                 is ServerApiError.None -> { /* no-op */ }
             }
         }

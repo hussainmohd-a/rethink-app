@@ -91,14 +91,6 @@ class VpnServerAdapter(
     private var proxyStopped = false
 
     /**
-     * relay (hop) locations enter via AUTO, so when
-     * AUTO is paused they are effectively paused too, their status row and
-     * must show "Paused" regardless of their own state.
-     */
-    @Volatile
-    private var autoPaused = false
-
-    /**
      * Keys of selected servers whose WIN tunnel is not yet available
      * (VpnController.getWinByKey returned null immediately after startProxy).
      */
@@ -540,22 +532,11 @@ class VpnServerAdapter(
                 val id = group.proxyId()
                 val statusPair = VpnController.getProxyStatusById(id)
 
-                val isAuto = group.key.equals(AUTO_SERVER_ID, ignoreCase = true)
-                var isAutoPaused = false
-                if (isAuto) {
-                    autoPaused = statusPair.first == Backend.TPU
-                } else if (config?.hopEnabled == true) {
-                    isAutoPaused = runCatching {
-                        VpnController.getProxyStatusById(Backend.RpnWin).first == Backend.TPU
-                    }.getOrDefault(autoPaused)
-                    autoPaused = isAutoPaused
-                }
-
                 Logger.v(LOG_TAG_UI, "VpnServerAdapter fetchAndApplyStats for id: $id, config: $config, status: $statusPair")
                 uiCtx {
                     if (!b.root.isAttachedToWindow) return@uiCtx
 
-                    applyStats(config, statusPair, isAutoPaused)
+                    applyStats(config, statusPair)
                 }
             } catch (t: Throwable) {
                 Logger.w(LOG_TAG_UI, "VpnServerAdapter fetchAndApplyStats[${group.key}]: ${t.message}")
@@ -812,19 +793,6 @@ class VpnServerAdapter(
                 return
             }
             b.relayActionContainer.visibility = View.VISIBLE
-            if (config.hopEnabled && autoPaused) {
-                val pausedLabel = ctx.getString(R.string.cd_dns_crypt_relay_heading) + " · " +
-                    ctx.getString(R.string.pause_text).replaceFirstChar(Char::titlecase)
-                b.relayAction.text = ctx.getString(
-                    R.string.two_argument_space,
-                    ctx.getString(R.string.symbol_bunny),
-                    pausedLabel
-                )
-                b.relayAction.setTextColor(fetchColor(ctx, R.attr.chipTextNeutral))
-                b.relayActionContainer.backgroundTintList = null
-                b.relayIcon.visibility = View.VISIBLE
-                return
-            }
             val relayLabel = ctx.getString(R.string.cd_dns_crypt_relay_heading) + " · " +
                 ctx.getString(if (config.hopEnabled) R.string.lbl_on else R.string.lbl_off)
             if (config.hopEnabled) {
@@ -908,8 +876,7 @@ class VpnServerAdapter(
 
         private fun applyStats(
             config: CountryConfig?,
-            statusPair: Pair<Int?, String>,
-            isAutoPaused: Boolean = false
+            statusPair: Pair<Int?, String>
         ) {
             if (config == null) {
                 hideStats()
@@ -922,14 +889,6 @@ class VpnServerAdapter(
             // Status chip
             val status = UIUtils.ProxyStatus.entries.find { it.id == statusPair.first }
 
-            if (isAutoPaused && status != UIUtils.ProxyStatus.TPU) {
-                currentProxyStatus = UIUtils.ProxyStatus.TPU
-                b.tvServerStatus.text = ctx.getString(UIUtils.getProxyStatusStringRes(UIUtils.ProxyStatus.TPU.id))
-                    .replaceFirstChar(Char::titlecase)
-                b.tvServerStatus.setTextColor(fetchColor(ctx, getStatusColor(UIUtils.ProxyStatus.TPU)))
-                renderStatusRow()
-                return
-            }
             currentProxyStatus = status
             b.tvServerStatus.text = getStatusText(status, statusPair.second)
             b.tvServerStatus.setTextColor(fetchColor(ctx, getStatusColor(status)))

@@ -111,7 +111,8 @@
                 android:layout_marginStart="6dp"
                 android:importantForAccessibility="no"
                 android:src="@drawable/ic_check_circle"
-                android:tint="?attr/accentGood"
+                android:alpha="0.75"
+                android:tint="?attr/chipBgColorPositive"
                 android:visibility="gone"
                 tools:visibility="visible" />
 

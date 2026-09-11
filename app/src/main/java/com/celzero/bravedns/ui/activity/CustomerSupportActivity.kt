@@ -382,6 +382,7 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
                 sb.append("  orderId          : ${s.orderId.ifEmpty { "N/A" }}\n")
                 // accountId: max 12 chars visible, rest redacted
                 sb.append("  accountId        : ${redactId(s.accountId)}\n")
+                sb.append("  deviceId         : ${redactDid(s.deviceId)}\n")
                 sb.append("  purchaseTime     : ${formatTs(s.purchaseTime)}\n")
                 sb.append("  billingExpiry    : ${formatTs(s.billingExpiry)}\n")
                 sb.append("  accountExpiry    : ${formatTs(s.accountExpiry)}\n")
@@ -669,6 +670,11 @@ class CustomerSupportActivity : BaseActivity(R.layout.activity_customer_support)
     private fun redactId(id: String): String {
         if (id.isEmpty()) return "N/A"
         return if (id.length > 12) "${id.take(12)}***" else id
+    }
+
+    private fun redactDid(id: String): String {
+        if (id.isEmpty()) return "N/A"
+        return if (id.length > 4) "${id.take(4)}***" else id
     }
 
     private fun setLoading(loading: Boolean) {

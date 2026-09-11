@@ -26,6 +26,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.icu.text.CompactDecimalFormat
 import android.os.Bundle
+import android.provider.Settings
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateUtils
@@ -90,6 +91,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.ext.android.inject
@@ -146,6 +148,17 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
     private var serverLoadingJob: Job? = null
     /** Job driving the RPN reset progress loop. */
     private var rpnResetJob: Job? = null
+    /**
+     * Gentle looping bob on the error card's dolphin while the error/empty
+     * state is visible; cancelled when the state is dismissed.
+     */
+    private var errorDolphinAnimator: ObjectAnimator? = null
+
+    /**
+     * Job polling for the VPN tunnel after the user taps "Start Rethink" on
+     * the no-tunnel error card; re-drives the screen once the tunnel is up.
+     */
+    private var errorTunnelWaitJob: Job? = null
     /** Dialog shown while RPN reset is in progress. */
     private var rpnResetDialog: android.app.Dialog? = null
     private var resetDialogDismissedByUser = false
@@ -221,6 +234,18 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
          */
         private const val MAX_SELECTIONS = 5
 
+        /** Half of the error card dolphin's bob cycle (down + up = one loop). */
+        private const val ERROR_DOLPHIN_BOB_HALF_MS = 1_000L
+
+        /** How far the error card dolphin floats up on each bob, in dp. */
+        private const val ERROR_DOLPHIN_BOB_DP = 5f
+
+        /** How long to wait for the VPN tunnel after "Start Rethink" is tapped. */
+        private const val TUNNEL_WAIT_TIMEOUT_MS = 20_000L
+
+        /** Poll interval while waiting for the VPN tunnel to come up. */
+        private const val TUNNEL_WAIT_POLL_MS = 500L
+
         /**
          * Delay before the premium RPN onboarding tour starts, in milliseconds.
          */
@@ -279,7 +304,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
         // base dot diameter in dp before the per-level fill fraction; sized so
         // 24 columns + 2dp gaps fit the narrowest supported screens (~320dp)
-        private const val RPN_HEATMAP_DOT_SIZE_DP = 6f
+        private const val RPN_HEATMAP_DOT_SIZE_DP = 5f
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -2168,7 +2193,9 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
     private fun showEmptyState() {
         showUnifiedErrorState(
-            illustration = R.drawable.illustrations_no_record,
+            illustration = EmbeddedDolphinContent.failureDrawable(
+                EmbeddedDolphinContent.FailureFlavor.CONFUSED
+            ),
             title = getString(R.string.server_selection_no_servers),
             hint = getString(R.string.server_selection_no_servers_hint),
             isError = false
@@ -2177,16 +2204,22 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
     private fun showErrorState(noTunnel: Boolean = false) {
         if (noTunnel) {
+            // VPN/tunnel is down; saying "Error fetching locations" would
+            // mislead — the fetch never ran. Point the user at the fix.
             showUnifiedErrorState(
-                illustration = R.drawable.illustrations_no_record,
-                title = getString(R.string.server_selection_error_title),
-                hint = getString(R.string.ssv_toast_start_rethink),
+                illustration = EmbeddedDolphinContent.failureDrawable(
+                    EmbeddedDolphinContent.FailureFlavor.OFFLINE
+                ),
+                title = getString(R.string.server_selection_vpn_stopped_title),
+                hint = getString(R.string.server_selection_vpn_stopped_hint),
                 isError = true,
                 noTunnel = true
             )
         } else {
             showUnifiedErrorState(
-                illustration = R.drawable.illustrations_no_record,
+                illustration = EmbeddedDolphinContent.failureDrawable(
+                    EmbeddedDolphinContent.FailureFlavor.SERVER
+                ),
                 title = getString(R.string.server_selection_error_title),
                 hint = getString(R.string.server_selection_error_hint),
                 isError = true
@@ -2224,14 +2257,10 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         b.frequentCountriesSection.isVisible = false
         b.locationCapacityIndicator.isVisible = false
 
-        // Update content: illustration sits on a soft tinted circle whose color
-        // follows the state (red for errors, muted for the empty state).
-        val tintColor = resolveAttrColor(if (isError) R.attr.accentBad else R.attr.primaryLightColorText)
+        // Update content: the sad-dolphin artwork is full-colour, so it is
+        // rendered untinted and reads correctly in both light and dark themes.
         b.errorIllustration.setImageResource(illustration)
-        b.errorIllustration.imageTintList = ColorStateList.valueOf(tintColor)
-        b.errorIconContainer.backgroundTintList = ColorStateList.valueOf(
-            ColorUtils.setAlphaComponent(tintColor, (255 * 0.12f).toInt())
-        )
+        b.errorIllustration.imageTintList = null
         b.errorTitle.text = title
         b.errorHint.text = hint
         b.errorHint.isVisible = hint.isNotEmpty()
@@ -2256,12 +2285,19 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             .setInterpolator(AccelerateDecelerateInterpolator())
             .start()
 
+        // The error card itself carries the themed sad dolphin, so hide the
+        // dolphin signature at the bottom of the screen: one sad dolphin per
+        // screen reads cleaner than two competing for attention. It comes
+        // back in hideErrorState().
+        b.dolphinSignature.isVisible = false
+        startErrorDolphinAnimation()
+
         if (noTunnel) {
             b.errorRetryBtn.isVisible = true
-            b.errorRetryBtn.isEnabled = false
-            b.errorRetryBtn.isClickable = false
+            b.errorRetryBtn.isEnabled = true
+            b.errorRetryBtn.isClickable = true
             b.errorRetryBtn.text = getString(R.string.ssv_toast_start_rethink)
-            b.errorRetryBtn.setOnClickListener(null)
+            b.errorRetryBtn.setOnClickListener { startRethinkFromErrorCard() }
             b.errorResetBtn.isVisible = false
             b.errorReportBtn.isVisible = true
             b.errorReportBtn.setOnClickListener { openHelpAndSupport() }
@@ -2305,6 +2341,11 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
     private fun hideErrorState() {
         if (!isAdded) return
+        // Stop the bobbing dolphin and any pending tunnel wait before
+        // recovering the screen.
+        stopErrorDolphinAnimation()
+        errorTunnelWaitJob?.cancel()
+        errorTunnelWaitJob = null
         if (b.errorStateContainer.isVisible) {
             b.errorStateContainer.animate()
                 .alpha(0f).translationY(-40f)
@@ -2320,13 +2361,98 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         b.settingsBtn.isVisible = true
         b.statusCard.isVisible = true
         updateVpnStatus()
+        // Recovered from the error/empty state; bring the signature back with
+        // a fresh regular (non-failure) pairing.
+        b.dolphinSignature.isVisible = true
+        b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
         b.searchCard.isEnabled = true
         b.searchBar.isEnabled = true
         if (!isProxyStopped) updateCapacityIndicator()
     }
 
+    /**
+     * Gently bobs the error card's dolphin up and down on a
+     * [ERROR_DOLPHIN_BOB_HALF_MS]-per-direction loop (a full up-down cycle
+     * every two seconds) so the moment feels alive without any image swaps.
+     * Skipped entirely when the system's animator duration scale is off.
+     */
+    private fun startErrorDolphinAnimation() {
+        stopErrorDolphinAnimation()
+        if (isReducedMotionPreferred()) return
+        val bobPx = ERROR_DOLPHIN_BOB_DP * resources.displayMetrics.density
+        errorDolphinAnimator = ObjectAnimator.ofFloat(
+            b.errorIllustration, View.TRANSLATION_Y, 0f, -bobPx
+        ).apply {
+            duration = ERROR_DOLPHIN_BOB_HALF_MS
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun stopErrorDolphinAnimation() {
+        errorDolphinAnimator?.cancel()
+        errorDolphinAnimator = null
+        if (isAdded) b.errorIllustration.translationY = 0f
+    }
+
+    /**
+     * Handles the "Start Rethink" tap on the no-tunnel error card: requests
+     * the VPN to start, gives immediate feedback on the button, then polls
+     * briefly for the tunnel. Once it is up, the normal retry path takes
+     * over (loading dialog, registration, server list); if it never comes
+     * up (e.g. consent denied), the no-tunnel card is restored.
+     */
+    private fun startRethinkFromErrorCard() {
+        if (!isAdded) return
+        Logger.i(LOG_TAG_UI, "$TAG.startRethinkFromErrorCard: requesting VPN start")
+        errorTunnelWaitJob?.cancel()
+        VpnController.start(requireContext(), true)
+
+        b.errorRetryBtn.isEnabled = false
+        b.errorRetryBtn.isClickable = false
+        b.errorRetryBtn.text = getString(R.string.lbl_connecting)
+        updateConnectionStatus(ConnectionUiState.CONNECTING)
+
+        errorTunnelWaitJob = viewLifecycleOwner.lifecycleScope.launch {
+            val deadline = System.currentTimeMillis() + TUNNEL_WAIT_TIMEOUT_MS
+            while (isActive && System.currentTimeMillis() < deadline) {
+                delay(TUNNEL_WAIT_POLL_MS)
+                val hasTunnel = withContext(Dispatchers.IO) {
+                    try { VpnController.hasTunnel() } catch (_: Exception) { false }
+                }
+                if (hasTunnel) {
+                    if (!isAdded) return@launch
+                    Logger.i(LOG_TAG_UI, "$TAG.startRethinkFromErrorCard: tunnel up, retrying")
+                    // detach from the job before re-entering retryLoadingServers,
+                    // which cancels any still-registered wait job
+                    errorTunnelWaitJob = null
+                    retryLoadingServers()
+                    return@launch
+                }
+            }
+            if (isAdded) {
+                Logger.w(LOG_TAG_UI, "$TAG.startRethinkFromErrorCard: tunnel wait timed out")
+                showErrorState(noTunnel = true)
+            }
+        }
+    }
+
+    private fun isReducedMotionPreferred(): Boolean =
+        Settings.Global.getFloat(
+            context?.contentResolver ?: return true,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f
+        ) == 0f
+
     private fun retryLoadingServers() {
         if (!isAdded) return
+        // A pending "Start Rethink" tunnel wait is superseded by an explicit
+        // retry (if this call came from the wait itself, it already detached
+        // its job reference above).
+        errorTunnelWaitJob?.cancel()
+        errorTunnelWaitJob = null
         if (!RpnProxyManager.isRpnActive()) {
             showToast(getString(R.string.server_selection_tap_to_select))
             return
