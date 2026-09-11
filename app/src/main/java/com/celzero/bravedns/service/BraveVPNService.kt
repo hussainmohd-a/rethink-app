@@ -2990,6 +2990,8 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Network
         // conn-tracking state so the next VPN session doesn't inherit stale
         // active connections / closable cids / rx-traffic timer from this one
         TunFlowManager.clear()
+        // same for TunDnsManager's fid -> dns-filter-decision cache
+        TunDnsManager.clearTrackedDnsFilterReasons()
 
         unobserveOrbotStartStatus()
         unobserveAppInfos()

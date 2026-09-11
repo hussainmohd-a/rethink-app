@@ -33,6 +33,7 @@ import android.widget.AdapterView
 import android.widget.ImageView
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.view.isVisible
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.RequestBuilder
@@ -54,16 +55,17 @@ import com.celzero.bravedns.glide.FavIconDownloader
 import com.celzero.bravedns.service.DomainRulesManager
 import com.celzero.bravedns.service.EventLogger
 import com.celzero.bravedns.service.FirewallManager
+import com.celzero.bravedns.service.FirewallRuleset
 import com.celzero.bravedns.service.PersistentState
 import com.celzero.bravedns.ui.activity.DomainConnectionsActivity
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.ResourceRecordTypes
 import com.celzero.bravedns.util.Themes
+import com.celzero.bravedns.util.UIUtils
 import com.celzero.bravedns.util.UIUtils.fetchColor
 import com.celzero.bravedns.util.UIUtils.htmlToSpannedText
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.util.Utilities.getIcon
-import com.celzero.bravedns.util.useTransparentNoDimBackground
 import com.celzero.bravedns.viewmodel.DomainConnectionsViewModel
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -103,11 +105,6 @@ class DnsBlocklistBottomSheet : BaseBottomSheetDialogFragment() {
     ): View {
         _binding = BottomSheetDnsLogBinding.inflate(inflater, container, false)
         return b.root
-    }
-
-    override fun onStart() {
-        super.onStart()
-        dialog?.useTransparentNoDimBackground()
     }
 
     // enum to represent the status of the domain in the chip (ui)
@@ -425,6 +422,10 @@ class DnsBlocklistBottomSheet : BaseBottomSheetDialogFragment() {
 
         displayDescription()
 
+        // show the exact rule that blocked/allowed this query, when recorded during the
+        // upstream-answer evaluation; fall back to the generic chips otherwise
+        if (handleFilterReasonChip()) return
+
         if (currentLog.groundedQuery() || currentLog.hasBlocklists() || currentLog.upstreamBlock) {
             handleBlocklistChip()
             b.dnsBlockIpsChip.visibility = View.GONE
@@ -432,6 +433,57 @@ class DnsBlocklistBottomSheet : BaseBottomSheetDialogFragment() {
         }
 
         handleResponseIpsChip()
+    }
+
+    /**
+     * Renders the blocklist chip with the firewall rule recorded for this query (see
+     * DnsLog#blockedReason), similar to the conn-track sheet's rule chip. Returns true
+     * when the reason chip was shown, false when no specific rule is available and the
+     * caller should fall back to the generic blocklist / response-ips chips.
+     */
+    private fun handleFilterReasonChip(): Boolean {
+        val currentLog = log ?: return false
+
+        val rule = FirewallRuleset.getFirewallRule(currentLog.blockedReason) ?: return false
+
+        b.dnsBlockBlocklistChip.visibility = View.VISIBLE
+        b.dnsBlockIpsChip.visibility = View.GONE
+        val blocked = FirewallRuleset.ground(rule)
+        lightenUpChip(
+            b.dnsBlockBlocklistChip,
+            if (blocked) BlockType.BLOCKED else BlockType.ALLOWED
+        )
+        b.dnsBlockBlocklistChip.text = getString(rule.title)
+        b.dnsBlockBlocklistChip.setOnClickListener { showFilterReasonDialog(rule) }
+        return true
+    }
+
+    // explanation dialog for the filter-reason chip, mirrors the conn-track sheet's
+    // firewall-rules dialog (title, description, icon)
+    private fun showFilterReasonDialog(rule: FirewallRuleset) {
+        val dialogBinding = DialogInfoRulesLayoutBinding.inflate(layoutInflater)
+        val builder = MaterialAlertDialogBuilder(requireContext(), R.style.App_Dialog_NoDim).setView(dialogBinding.root)
+        val lp = WindowManager.LayoutParams()
+        val dialog = builder.create()
+        dialog.show()
+        lp.copyFrom(dialog.window?.attributes)
+        lp.width = WindowManager.LayoutParams.MATCH_PARENT
+        lp.height = WindowManager.LayoutParams.WRAP_CONTENT
+
+        dialog.setCancelable(true)
+        dialog.window?.attributes = lp
+        // keep the dialog within the app's max width on expanded windows (foldables/tablets)
+        UIUtils.capDialogWidth(dialog)
+
+        dialogBinding.infoRulesDialogRulesTitle.text = getString(rule.title)
+        dialogBinding.infoRulesDialogRulesDesc.text = htmlToSpannedText(getString(rule.desc))
+        dialogBinding.infoRulesDialogRulesIcon.visibility = View.VISIBLE
+        dialogBinding.infoRulesDialogRulesIcon.setImageDrawable(
+            ContextCompat.getDrawable(requireContext(), FirewallRuleset.getRulesIcon(rule.id))
+        )
+
+        dialogBinding.infoRulesDialogCancelImg.setOnClickListener { dialog.dismiss() }
+        dialog.show()
     }
 
     private fun handleResponseIpsChip() {
@@ -595,6 +647,8 @@ class DnsBlocklistBottomSheet : BaseBottomSheetDialogFragment() {
 
         dialog.setCancelable(true)
         dialog.window?.attributes = lp
+        // keep the dialog within the app's max width on expanded windows (foldables/tablets)
+        UIUtils.capDialogWidth(dialog)
 
         if (b.dnsBlockFavIcon.isVisible)
             dialogBinding.ipDetailsFavIcon.setImageDrawable(b.dnsBlockFavIcon.drawable)
@@ -613,7 +667,7 @@ class DnsBlocklistBottomSheet : BaseBottomSheetDialogFragment() {
 
         list.forEach {
             text +=
-                getString(R.string.dns_btm_sheet_dialog_ips, Utilities.getFlag(it.slice(0..2)), it)
+                getString(R.string.dns_btm_sheet_dialog_ips, Utilities.getFlag(it.slice(0..1)), it)
         }
         return htmlToSpannedText(text)
     }
