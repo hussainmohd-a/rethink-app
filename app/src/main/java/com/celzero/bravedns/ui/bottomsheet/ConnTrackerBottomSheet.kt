@@ -62,7 +62,6 @@ import com.celzero.bravedns.util.UIUtils.htmlToSpannedText
 import com.celzero.bravedns.util.Utilities
 import com.celzero.bravedns.util.Utilities.getIcon
 import com.celzero.bravedns.util.Utilities.showToastUiCentered
-import com.celzero.bravedns.util.useTransparentNoDimBackground
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.common.collect.HashMultimap
 import com.google.common.collect.Multimap
@@ -173,11 +172,6 @@ class ConnTrackerBottomSheet : BaseBottomSheetDialogFragment(), KoinComponent {
             val connStatus = FirewallManager.connectionStatus(uid)
             uiCtx { updateFirewallRulesUi(appStatus, connStatus) }
         }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        dialog?.useTransparentNoDimBackground()
     }
 
     private fun updateDnsIfAvailable() {
@@ -654,6 +648,8 @@ class ConnTrackerBottomSheet : BaseBottomSheetDialogFragment(), KoinComponent {
 
         dialog.setCancelable(true)
         dialog.window?.attributes = lp
+        // keep the dialog within the app's max width on expanded windows (foldables/tablets)
+        UIUtils.capDialogWidth(dialog)
 
         val heading = dialogBinding.infoRulesDialogRulesTitle
         val okBtn = dialogBinding.infoRulesDialogCancelImg
