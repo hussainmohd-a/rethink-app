@@ -101,14 +101,13 @@
                             android:fontFamily="sans-serif-medium"
                             android:maxLines="1"
                             tools:text="DNS · Connected"
-                            android:textColor="?attr/primaryLightColorText"
+                            android:textColor="?attr/primaryTextColor"
                             android:textSize="@dimen/large_font_text_view" />
 
                         <androidx.appcompat.widget.AppCompatTextView
                             android:id="@+id/fhs_card_dns_latency"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:alpha="0.5"
                             android:maxLines="1"
                             android:ellipsize="marquee"
                             tools:text="BLR(– ms)"
@@ -154,7 +153,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:alpha="0.8"
                         tools:text="B/S"
                         android:textColor="?attr/primaryLightColorText"
                         android:textSize="@dimen/mini_font_text_view" />
@@ -217,8 +215,12 @@
                                     android:letterSpacing="0.08"
                                     android:text="UNIV"
                                     android:textAllCaps="true"
+                                    android:gravity="center"
                                     android:textColor="?attr/primaryLightColorText"
-                                    android:textSize="@dimen/extra_small_font_text_view" />
+                                    app:autoSizeMaxTextSize="8sp"
+                                    app:autoSizeMinTextSize="6sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
@@ -256,9 +258,12 @@
                                     android:layout_marginTop="1dp"
                                     android:letterSpacing="0.08"
                                     android:text="@string/lbl_ip"
-                                    android:textAllCaps="true"
+                                    android:gravity="center"
                                     android:textColor="?attr/primaryLightColorText"
-                                    android:textSize="@dimen/extra_small_font_text_view" />
+                                    app:autoSizeMaxTextSize="8sp"
+                                    app:autoSizeMinTextSize="6sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
@@ -297,8 +302,12 @@
                                     android:letterSpacing="0.08"
                                     android:text="DOM"
                                     android:textAllCaps="true"
+                                    android:gravity="center"
                                     android:textColor="?attr/primaryLightColorText"
-                                    android:textSize="@dimen/extra_small_font_text_view" />
+                                    app:autoSizeMaxTextSize="8sp"
+                                    app:autoSizeMinTextSize="6sp"
+                                    app:autoSizeStepGranularity="1sp"
+                                    app:autoSizeTextType="uniform" />
                             </LinearLayout>
                         </com.google.android.material.card.MaterialCardView>
 
@@ -430,7 +439,7 @@
                                         android:text="@string/lbl_active"
                                         android:textAllCaps="true"
                                         android:textColor="?attr/primaryLightColorText"
-                                        app:autoSizeMaxTextSize="10sp"
+                                        app:autoSizeMaxTextSize="8sp"
                                         app:autoSizeMinTextSize="6sp"
                                         app:autoSizeStepGranularity="1sp"
                                         app:autoSizeTextType="uniform" />
@@ -479,7 +488,7 @@
                                         android:text="@string/lbl_idle"
                                         android:textAllCaps="true"
                                         android:textColor="?attr/primaryLightColorText"
-                                        app:autoSizeMaxTextSize="10sp"
+                                        app:autoSizeMaxTextSize="8sp"
                                         app:autoSizeMinTextSize="6sp"
                                         app:autoSizeStepGranularity="1sp"
                                         app:autoSizeTextType="uniform" />
@@ -528,7 +537,7 @@
                                         android:text="@string/status_failing"
                                         android:textAllCaps="true"
                                         android:textColor="?attr/primaryLightColorText"
-                                        app:autoSizeMaxTextSize="10sp"
+                                        app:autoSizeMaxTextSize="8sp"
                                         app:autoSizeMinTextSize="6sp"
                                         app:autoSizeStepGranularity="1sp"
                                         app:autoSizeTextType="uniform" />
@@ -579,7 +588,7 @@
                                         android:text="@string/lbl_stopped"
                                         android:textAllCaps="true"
                                         android:textColor="?attr/primaryLightColorText"
-                                        app:autoSizeMaxTextSize="10sp"
+                                        app:autoSizeMaxTextSize="8sp"
                                         app:autoSizeMinTextSize="6sp"
                                         app:autoSizeStepGranularity="1sp"
                                         app:autoSizeTextType="uniform" />
