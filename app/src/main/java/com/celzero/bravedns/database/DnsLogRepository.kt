@@ -71,4 +71,13 @@ class DnsLogRepository(private val dnsLogDAO: DnsLogDAO) {
     ): List<DnsLog> {
         return dnsLogDAO.getDnsLogsInWindowForUid(start, end, uid, limit)
     }
+
+    suspend fun getDomainActivityForUid(
+        start: Long,
+        end: Long,
+        uid: Int,
+        limit: Int
+    ): List<DomainActivityRow> {
+        return dnsLogDAO.getDomainActivityForUid(start, end, uid, limit)
+    }
 }

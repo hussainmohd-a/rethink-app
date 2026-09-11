@@ -97,6 +97,16 @@ interface ConnectionTrackerDAO {
     ): List<ConnectionTracker>
 
     @Query(
+        "select coalesce(nullif(dnsQuery, ''), ipAddress) as label, count(id) as total, sum(case when isBlocked then 1 else 0 end) as blocked, max(timeStamp) as lastSeen, substr(max(printf('%016d', timeStamp) || flag), 17) as flag from ConnectionTracker where timeStamp >= :start and timeStamp < :end and uid = :uid group by label order by total desc limit :limit"
+    )
+    suspend fun getDomainActivityForUid(
+        start: Long,
+        end: Long,
+        uid: Int,
+        limit: Int
+    ): List<DomainActivityRow>
+
+    @Query(
         "update ConnectionTracker set proxyDetails = :pid, rpid = :rpid, downloadBytes = :downloadBytes, uploadBytes = :uploadBytes, duration = :duration, synack = :synack, message = :message where connId = :connId"
     )
     fun updateSummary(
@@ -443,6 +453,17 @@ interface ConnectionTrackerDAO {
         uid: Int,
         limit: Int
     ): List<ConnectionTracker>
+
+    @Query(
+        "select coalesce(nullif(dnsQuery, ''), ipAddress) as label, count(id) as total, sum(case when isBlocked then 1 else 0 end) as blocked, max(timeStamp) as lastSeen, substr(max(printf('%016d', timeStamp) || flag), 17) as flag from ConnectionTracker where timeStamp >= :start and timeStamp < :end and uid = :uid and proxyDetails like :proxyIdFilter group by label order by total desc limit :limit"
+    )
+    suspend fun getRpnDomainActivityForUid(
+        proxyIdFilter: String,
+        start: Long,
+        end: Long,
+        uid: Int,
+        limit: Int
+    ): List<DomainActivityRow>
 
     @Query("update ConnectionTracker set message = :reason, duration = 0 where connId in (:connIds) and message = '' and uploadBytes = 0 and downloadBytes = 0 and synack = 0")
     fun closeConnections(connIds: List<String>, reason: String)

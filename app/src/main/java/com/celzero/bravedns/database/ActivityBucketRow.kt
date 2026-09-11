@@ -47,3 +47,18 @@ data class AppActivityRow(
     val total: Long,
     val blocked: Long
 )
+
+/**
+ * Per-domain activity counts within a time window for a single uid, grouped
+ * across the dns/connection log tables. [label] is the domain (dnsQuery),
+ * falling back to the IP address when no domain was resolved for the
+ * connection; [lastSeen] is the most recent timestamp for that label and
+ * [flag] is the region emoji recorded on that latest row.
+ */
+data class DomainActivityRow(
+    val label: String,
+    val total: Long,
+    val blocked: Long,
+    val lastSeen: Long,
+    val flag: String
+)

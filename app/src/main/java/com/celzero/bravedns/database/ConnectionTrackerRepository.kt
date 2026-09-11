@@ -139,6 +139,15 @@ class ConnectionTrackerRepository(private val connectionTrackerDAO: ConnectionTr
         return connectionTrackerDAO.getConnectionsInWindowForUid(start, end, uid, limit)
     }
 
+    suspend fun getDomainActivityForUid(
+        start: Long,
+        end: Long,
+        uid: Int,
+        limit: Int
+    ): List<DomainActivityRow> {
+        return connectionTrackerDAO.getDomainActivityForUid(start, end, uid, limit)
+    }
+
     suspend fun getRpnActivityBuckets(
         proxyIdFilter: String,
         rangeStart: Long,
@@ -178,6 +187,22 @@ class ConnectionTrackerRepository(private val connectionTrackerDAO: ConnectionTr
         limit: Int
     ): List<ConnectionTracker> {
         return connectionTrackerDAO.getRpnConnectionsInWindowForUid(
+            proxyIdFilter,
+            start,
+            end,
+            uid,
+            limit
+        )
+    }
+
+    suspend fun getRpnDomainActivityForUid(
+        proxyIdFilter: String,
+        start: Long,
+        end: Long,
+        uid: Int,
+        limit: Int
+    ): List<DomainActivityRow> {
+        return connectionTrackerDAO.getRpnDomainActivityForUid(
             proxyIdFilter,
             start,
             end,

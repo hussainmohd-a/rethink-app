@@ -147,6 +147,11 @@ interface DnsLogDAO {
         "select * from DNSLogs where time >= :start and time < :end and uid = :uid order by id desc limit :limit"
     )
     suspend fun getDnsLogsInWindowForUid(start: Long, end: Long, uid: Int, limit: Int): List<DnsLog>
+
+    @Query(
+        "select queryStr as label, count(id) as total, sum(case when isBlocked then 1 else 0 end) as blocked, max(time) as lastSeen, substr(max(printf('%016d', time) || flag), 17) as flag from DNSLogs where time >= :start and time < :end and uid = :uid and queryStr != '' group by queryStr order by total desc limit :limit"
+    )
+    suspend fun getDomainActivityForUid(start: Long, end: Long, uid: Int, limit: Int): List<DomainActivityRow>
 }
 
 data class BlockedDnsAppResult(
