@@ -49,6 +49,40 @@ data class AppActivityRow(
 )
 
 /**
+ * Per-app data usage within a time window, aggregated from the
+ * connection-tracker table and split by connection type and direction.
+ * Values are byte sums of the corresponding rows for that (uid, appName).
+ */
+data class AppUsageRow(
+    val uid: Int,
+    val appName: String,
+    val meteredUploadBytes: Long,
+    val meteredDownloadBytes: Long,
+    val unmeteredUploadBytes: Long,
+    val unmeteredDownloadBytes: Long
+) {
+
+    fun meteredTotalBytes(): Long = meteredUploadBytes + meteredDownloadBytes
+
+    fun unmeteredTotalBytes(): Long = unmeteredUploadBytes + unmeteredDownloadBytes
+
+    fun totalBytes(): Long = meteredTotalBytes() + unmeteredTotalBytes()
+}
+
+/**
+ * Per-app count of blocked rows within a time window, aggregatable across
+ * the dns-log and connection-tracker tables. Rows from the two tables are
+ * distinct events (a blocked dns query vs a blocked connection); merging by
+ * (uid, appName) keeps one entry per app so an app present in both sources
+ * contributes a single summed entry instead of two.
+ */
+data class AppBlockedRow(
+    val uid: Int,
+    val appName: String,
+    val blocked: Long
+)
+
+/**
  * Per-domain activity counts within a time window for a single uid, grouped
  * across the dns/connection log tables. [label] is the domain (dnsQuery),
  * falling back to the IP address when no domain was resolved for the

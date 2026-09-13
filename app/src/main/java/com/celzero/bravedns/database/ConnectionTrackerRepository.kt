@@ -130,6 +130,14 @@ class ConnectionTrackerRepository(private val connectionTrackerDAO: ConnectionTr
         return connectionTrackerDAO.getAppActivity(start, end, limit)
     }
 
+    suspend fun getTopAppsByUsage(start: Long, end: Long, limit: Int): List<AppUsageRow> {
+        return connectionTrackerDAO.getTopAppsByUsage(start, end, limit)
+    }
+
+    suspend fun getTopBlockedApps(start: Long, end: Long, limit: Int): List<AppBlockedRow> {
+        return connectionTrackerDAO.getTopBlockedApps(start, end, limit)
+    }
+
     suspend fun getConnectionsInWindowForUid(
         start: Long,
         end: Long,

@@ -86,6 +86,30 @@ interface ConnectionTrackerDAO {
     )
     suspend fun getAppActivity(start: Long, end: Long, limit: Int): List<AppActivityRow>
 
+    // per-app data usage split by connection type and direction, ranked by
+    // total bytes; connType stores the ConnectionTracker.ConnType values
+    // ("Metered"/"Unmetered") as text
+    @Query(
+        "select uid as uid, appName as appName, " +
+            "sum(case when connType = 'Metered' then uploadBytes else 0 end) as meteredUploadBytes, " +
+            "sum(case when connType = 'Metered' then downloadBytes else 0 end) as meteredDownloadBytes, " +
+            "sum(case when connType = 'Unmetered' then uploadBytes else 0 end) as unmeteredUploadBytes, " +
+            "sum(case when connType = 'Unmetered' then downloadBytes else 0 end) as unmeteredDownloadBytes " +
+            "from ConnectionTracker where timeStamp >= :start and timeStamp < :end " +
+            "group by uid, appName order by (sum(uploadBytes) + sum(downloadBytes)) desc limit :limit"
+    )
+    suspend fun getTopAppsByUsage(start: Long, end: Long, limit: Int): List<AppUsageRow>
+
+    // apps ranked by blocked connection count within the window; rows are
+    // distinct events from dns-log rows, so merging with DnsLogDAO results by
+    // (uid, appName) sums the two event kinds without double counting
+    @Query(
+        "select uid as uid, appName as appName, sum(case when isBlocked then 1 else 0 end) as blocked " +
+            "from ConnectionTracker where timeStamp >= :start and timeStamp < :end " +
+            "group by uid, appName having blocked > 0 order by blocked desc limit :limit"
+    )
+    suspend fun getTopBlockedApps(start: Long, end: Long, limit: Int): List<AppBlockedRow>
+
     @Query(
         "select * from ConnectionTracker where timeStamp >= :start and timeStamp < :end and uid = :uid order by id desc limit :limit"
     )

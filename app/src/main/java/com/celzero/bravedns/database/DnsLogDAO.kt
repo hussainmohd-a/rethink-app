@@ -143,6 +143,16 @@ interface DnsLogDAO {
     )
     suspend fun getAppActivity(start: Long, end: Long, limit: Int): List<AppActivityRow>
 
+    // apps ranked by blocked dns queries within the window; rows are distinct
+    // events from connection-tracker rows, so merging with ConnectionTrackerDAO
+    // results by (uid, appName) sums the two event kinds without double counting
+    @Query(
+        "select uid as uid, appName as appName, sum(case when isBlocked then 1 else 0 end) as blocked " +
+            "from DNSLogs where time >= :start and time < :end " +
+            "group by uid, appName having blocked > 0 order by blocked desc limit :limit"
+    )
+    suspend fun getTopBlockedApps(start: Long, end: Long, limit: Int): List<AppBlockedRow>
+
     @Query(
         "select * from DNSLogs where time >= :start and time < :end and uid = :uid order by id desc limit :limit"
     )
