@@ -65,6 +65,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
 
     private var isTesting = false
     private var testStartTime: Long = 0
+    private var dolphinSwimAnim: AnimatorSet? = null
     private val historyAdapter by lazy { PingTestHistoryAdapter(this) }
 
     /**
@@ -105,9 +106,10 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
         }
     }
 
-    /** Dolphin signature (at the end of the scrollable content.); random pairing, fresh on every visit. */
+    /** Dolphin signature: bottom overlay revealed at the end of the history scroll. */
     private fun setDolphinSignature() {
         b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
+        b.dolphinSignature.revealAtScrollEndOf(b.historyScrollView)
     }
 
     private fun setupClickListeners() {
@@ -163,6 +165,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
     }
 
     private fun showReadyState() {
+        stopDolphinSwim()
         b.statusIcon.setImageResource(R.drawable.ic_shield_check)
         b.statusIcon.colorFilter = null
         b.statusIcon.setColorFilter(UIUtils.fetchColor(this, R.attr.primaryTextColor))
@@ -179,9 +182,13 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
         isTesting = true
         testStartTime = System.currentTimeMillis()
 
-        animateIconPulse()
+        // While the probes run, a dolphin swims in place of the plain icon.
+        // The artwork is full-colour, so it is rendered untinted to keep it
+        // readable in both light and dark themes.
+        b.statusIcon.setImageResource(EmbeddedDolphinContent.DOLPHINS.random())
+        b.statusIcon.colorFilter = null
+        animateDolphinSwim()
 
-        b.statusIcon.setColorFilter(UIUtils.fetchColor(this, R.attr.primaryTextColor))
         b.statusTitle.text = getString(R.string.ping_testing_title)
         b.statusDescription.text = getString(R.string.ping_testing_desc)
         b.pingButton.text = getString(R.string.ping_testing_title)
@@ -196,6 +203,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
 
     private fun showSuccessState(latencyMs: Long) {
         isTesting = false
+        stopDolphinSwim()
         animateSuccess()
 
         b.statusIcon.setImageResource(R.drawable.ic_tick)
@@ -214,6 +222,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
 
     private fun showPartialState(latencyMs: Long) {
         isTesting = false
+        stopDolphinSwim()
         animateFailure()
 
         b.statusIcon.setImageResource(R.drawable.ic_cross_accent)
@@ -232,6 +241,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
 
     private fun showFailureState() {
         isTesting = false
+        stopDolphinSwim()
         animateFailure()
 
         b.statusIcon.setImageResource(R.drawable.ic_cross_accent)
@@ -249,6 +259,7 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
 
     private fun showNoProxyState() {
         isTesting = false
+        stopDolphinSwim()
 
         b.statusIcon.setImageResource(R.drawable.ic_cross_accent)
         b.statusIcon.setColorFilter(ContextCompat.getColor(this, R.color.accentBad))
@@ -358,16 +369,38 @@ class PingTestActivity : BaseActivity(R.layout.activity_ping_test) {
         RpnProxyManager.recordPingTest(targets, outcome, latencyMs, passed, total)
     }
 
-    private fun animateIconPulse() {
-        val scaleX = ObjectAnimator.ofFloat(b.statusIcon, "scaleX", 1f, 0.75f, 1f)
-        val scaleY = ObjectAnimator.ofFloat(b.statusIcon, "scaleY", 1f, 0.75f, 1f)
-        val alpha  = ObjectAnimator.ofFloat(b.statusIcon, "alpha",  1f, 0.5f,  1f)
-        AnimatorSet().apply {
-            playTogether(scaleX, scaleY, alpha)
-            duration = 900
+    /**
+     * While the probes run, the dolphin bobs up and down and rocks gently,
+     * as if swimming in place; the loop runs until [stopDolphinSwim] is
+     * called when the test settles into a terminal state.
+     */
+    private fun animateDolphinSwim() {
+        stopDolphinSwim()
+        val bob = ObjectAnimator.ofFloat(b.statusIcon, View.TRANSLATION_Y, 0f, -16f, 0f, 16f, 0f).apply {
+            duration = 1200
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.RESTART
             interpolator = AccelerateDecelerateInterpolator()
+        }
+        val rock = ObjectAnimator.ofFloat(b.statusIcon, View.ROTATION, -8f, 8f, -8f).apply {
+            duration = 1200
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.RESTART
+            interpolator = AccelerateDecelerateInterpolator()
+        }
+        dolphinSwimAnim = AnimatorSet().apply {
+            playTogether(bob, rock)
             start()
         }
+    }
+
+    /** Cancels the swim loop and restores the icon's position and pose. */
+    private fun stopDolphinSwim() {
+        dolphinSwimAnim?.cancel()
+        dolphinSwimAnim = null
+        b.statusIcon.translationY = 0f
+        b.statusIcon.rotation = 0f
+        b.statusIcon.alpha = 1f
     }
 
     private fun animateSuccess() {

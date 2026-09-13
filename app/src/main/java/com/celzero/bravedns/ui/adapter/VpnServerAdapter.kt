@@ -48,6 +48,7 @@ import com.celzero.bravedns.rpnproxy.RpnProxyManager.AUTO_COUNTRY_CODE
 import com.celzero.bravedns.rpnproxy.RpnProxyManager.AUTO_SERVER_ID
 import com.celzero.bravedns.service.ProxyManager
 import com.celzero.bravedns.service.VpnController
+import com.celzero.bravedns.ui.custom.FlagWatermarkView
 import com.celzero.bravedns.ui.activity.NetworkLogsActivity
 import com.celzero.bravedns.ui.activity.NetworkLogsActivity.Companion.RULES_SEARCH_ID_RPN
 import com.celzero.bravedns.ui.activity.RpnConfigDetailActivity
@@ -198,6 +199,8 @@ class VpnServerAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ServerViewHolder {
         if (lifecycleOwner == null) lifecycleOwner = parent.findViewTreeLifecycleOwner()
         val b = ListItemVpnServerBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        // Clip the corner flag watermark against the card's rounded outline.
+        b.serverCard.clipToOutline = true
         return ServerViewHolder(b)
     }
 
@@ -271,6 +274,18 @@ class VpnServerAdapter(
             b.tvServerStatus.visibility = if (showCheck) View.GONE else View.VISIBLE
         }
 
+        /**
+         * Pushes the flag watermark past the card's top/end edges so the card's
+         * rounded outline clips it. XML presets the LTR translation; this keeps
+         * the bleed mirrored under RTL layout direction.
+         */
+        private fun applyWatermarkBleed() {
+            val bleed = FlagWatermarkView.CORNER_BLEED_DP * ctx.resources.displayMetrics.density
+            val rtl = b.serverCard.layoutDirection == View.LAYOUT_DIRECTION_RTL
+            //b.flagWatermark.translationX = if (rtl) -bleed else bleed
+            //b.flagWatermark.translationY = -bleed
+        }
+
 
         fun bind(group: ServerGroup) {
             b.tvServerIp.visibility = View.GONE
@@ -284,19 +299,21 @@ class VpnServerAdapter(
             if (group.key.equals(AUTO_SERVER_ID, ignoreCase = true)) {
                 b.refreshStopIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_refresh))
                 b.refreshStopIcon.visibility = View.VISIBLE
-                // AUTO server: show the vector ic_rpn_auto, hide the emoji text view
-                b.tvFlag.text = ""
-                b.ivFlagImage.visibility = View.VISIBLE
+                // AUTO carries no country flag; fall back to the globe glyph as the watermark.
+                b.flagWatermark.setFlagDrawable(
+                    AppCompatResources.getDrawable(context, R.drawable.ic_rpn_auto),
+                    R.attr.primaryTextColor
+                )
                 // AUTO's config carries no city; resolve the actual exit city from the
                 // backend (mirrors RpnConfigDetailActivity#showServerInfo for tvHeroCity).
                 resolveAutoCity(group)
             } else {
                 b.refreshStopIcon.visibility = View.VISIBLE
                 b.refreshStopIcon.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.ic_cross))
-                // Regular server: show the country flag emoji, hide the globe image
-                b.tvFlag.text = group.flagEmoji
-                b.ivFlagImage.visibility = View.GONE
+                // Regular server: render the country flag as the corner watermark.
+                b.flagWatermark.setFlagText(group.flagEmoji)
             }
+            applyWatermarkBleed()
 
             val locationText = if (group.key.equals(AUTO_SERVER_ID, ignoreCase = true)) {
                 "${group.cityName.capitalizeWords()} · ${AUTO_COUNTRY_CODE.capitalizeWords()}"

@@ -17,11 +17,16 @@ package com.celzero.bravedns.ui.fragment
 
 import com.celzero.bravedns.util.Logger
 import com.celzero.bravedns.util.Logger.LOG_TAG_UI
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
+import android.graphics.Path
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.icu.text.CompactDecimalFormat
@@ -31,14 +36,19 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.text.format.DateUtils
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
+import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.LinearInterpolator
 import android.view.animation.OvershootInterpolator
+import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -175,6 +185,28 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
     /** Looping spin animator running on the FAB icon while stop/start is in progress. */
     private var fabLoadingAnimator: ObjectAnimator? = null
 
+    /** Looping swim-across animation on the fx overlay while a pull-to-refresh is in flight. */
+    private var refreshSwimAnimator: AnimatorSet? = null
+
+    /** One-shot dolphin arc played on the fx overlay when a location finishes connecting. */
+    private var connectArcAnimator: AnimatorSet? = null
+
+    /** Looping dolphin orbit on the relay tile while a bulk toggle is in flight. */
+    private var relayOrbitAnimator: AnimatorSet? = null
+    private var relayOrbitView: FrameLayout? = null
+
+    /** Last caption rendered on the relay tile state text; drives the change pop. */
+    private var lastRelayCaption: String? = null
+
+    /**
+     * Last rendered filled-pill count for the location-capacity scale; the
+     * newly-filled pill pops only when this count increases.
+     */
+    private var lastFilledCapacity = 0
+
+    /** Previous connection UI state; CONNECTED transitions pulse the status dot once. */
+    private var lastConnectionUiState: ConnectionUiState? = null
+
     private var isWinRegistered = false
     private var autoServer: CountryConfig? = null
 
@@ -305,6 +337,21 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         // base dot diameter in dp before the per-level fill fraction; sized so
         // 24 columns + 2dp gaps fit the narrowest supported screens (~320dp)
         private const val RPN_HEATMAP_DOT_SIZE_DP = 5f
+
+        /** Bubbles emitted when a capacity pill fills. */
+        private const val CAPACITY_BUBBLE_COUNT = 2
+
+        /** Duration of the connect-celebration arc, in milliseconds. */
+        private const val CONNECT_ARC_DURATION_MS = 650L
+
+        /** Duration of one full left-to-right refresh swim, in milliseconds. */
+        private const val REFRESH_SWIM_DURATION_MS = 2400L
+
+        /** Relay toggle in-flight feedback: one dolphin lap around the tile. */
+        private const val RELAY_ORBIT_DURATION_MS = 1100L
+
+        /** Minimum time the relay orbit stays on screen, even for instant toggles. */
+        private const val MIN_RELAY_ORBIT_MS = 900L
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -342,7 +389,6 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         ViewCompat.requestApplyInsets(b.root)
 
         applyScrollPadding()
-        setDolphinSignature()
 
         setupNavigationButtons()
         setupSearchBar()
@@ -373,7 +419,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                     b.serversScrollView.paddingLeft,
                     b.serversScrollView.paddingTop,
                     b.serversScrollView.paddingRight,
-                    navView.height + 300
+                    navView.height + dpPx(24)
                 )
             }
         }
@@ -461,16 +507,11 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         b.serversScrollView.post {
             b.serversScrollView.setPadding(
                 b.serversScrollView.paddingLeft,
-                20,
+                dpPx(20),
                 b.serversScrollView.paddingRight,
                 b.serversScrollView.paddingBottom
             )
         }
-    }
-
-    /** Dolphin signature (at the end of the scrollable content.); random pairing, fresh on every visit. */
-    private fun setDolphinSignature() {
-        b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
     }
 
     /**
@@ -505,6 +546,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         if (swipeRefreshInFlight) return
         swipeRefreshInFlight = true
         b.swipeRefresh.isRefreshing = true
+        startRefreshSwim()
 
         io {
             val refreshed = if (RpnProxyManager.isRpnActive()) {
@@ -526,6 +568,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
             uiCtx {
                 swipeRefreshInFlight = false
+                stopRefreshSwim()
                 if (!isAdded) return@uiCtx
                 b.swipeRefresh.isRefreshing = false
                 if (refreshed) {
@@ -908,6 +951,14 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         statusUpdateJob = null
         tunnelWatchJob?.cancel()
         tunnelWatchJob = null
+        refreshSwimAnimator?.cancel()
+        refreshSwimAnimator = null
+        connectArcAnimator?.cancel()
+        connectArcAnimator = null
+        relayOrbitAnimator?.cancel()
+        relayOrbitAnimator = null
+        relayOrbitView?.let { runCatching { (it.parent as? ViewGroup)?.removeView(it) } }
+        relayOrbitView = null
         dismissServerLoadingDialog()
         dismissRpnResetDialog()
         super.onDestroyView()
@@ -1069,6 +1120,9 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                 unselectedServers.clear()
                 unselectedServers.addAll(localUnselected)
 
+                // a server-list (re)load is not a user action: sync the
+                // capacity scale silently; the pop animation arms again after
+                lastFilledCapacity = -1
                 updateHeaderSummary()
                 selectedAdapter.updateServers(selectedServers)
                 serverAdapter.updateCountries(buildCountries(unselectedServers))
@@ -1182,10 +1236,19 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         when (uiState) {
             ConnectionUiState.CONNECTED -> {
                 b.tvConnectionStatus.text = getString(R.string.lbl_active)
-                b.tvConnectionStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.accentGood))
-                b.statusIndicator.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.accentGood)
+                // attr-based lookup so every app theme variant supplies its own accent
+                b.tvConnectionStatus.setTextColor(resolveAttrColor(R.attr.chipTextPositive))
+                b.statusIndicator.backgroundTintList =
+                    ColorStateList.valueOf(resolveAttrColor(R.attr.chipTextPositive))
                 b.tvActiveDuration.alpha = 1f
                 startStatusBlink()
+                // a fresh CONNECTED transition (after CONNECTING/REGISTERING) pulses
+                // the dot once; repeat calls from the status poller stay silent
+                if (lastConnectionUiState == ConnectionUiState.CONNECTING ||
+                    lastConnectionUiState == ConnectionUiState.REGISTERING
+                ) {
+                    pulseStatusDot()
+                }
             }
             ConnectionUiState.CONNECTING -> {
                 b.tvConnectionStatus.text = getString(R.string.lbl_connecting)
@@ -1208,18 +1271,21 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             }
             ConnectionUiState.FAILED -> {
                 b.tvConnectionStatus.text = getString(R.string.ping_status_failed)
-                b.tvConnectionStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.accentBad))
-                b.statusIndicator.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.accentBad)
+                b.tvConnectionStatus.setTextColor(resolveAttrColor(R.attr.accentBad))
+                b.statusIndicator.backgroundTintList =
+                    ColorStateList.valueOf(resolveAttrColor(R.attr.accentBad))
                 stopStatusBlink()
                 b.tvActiveDuration.text = ""
             }
             ConnectionUiState.DISCONNECTED -> {
                 b.tvConnectionStatus.text = getString(R.string.lbl_inactive)
-                b.tvConnectionStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.accentBad))
-                b.statusIndicator.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.accentBad)
+                b.tvConnectionStatus.setTextColor(resolveAttrColor(R.attr.accentBad))
+                b.statusIndicator.backgroundTintList =
+                    ColorStateList.valueOf(resolveAttrColor(R.attr.accentBad))
                 stopStatusBlink()
             }
         }
+        lastConnectionUiState = uiState
     }
 
     /** Starts a gentle repeating alpha blink on the header status dot. */
@@ -1420,6 +1486,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
      * that hour (both evenly weighted, same approach as HomeScreenFragment's
      * activity wall).
      */
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupRpnHeatmapClicks() {
         b.rpnHeatmapGrid.setOnTouchListener { _, event ->
             lastHeatmapTouchX = event.x
@@ -1480,7 +1547,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             if (index < filled) {
                 dot.alpha = 1f
                 dot.backgroundTintList =
-                    ContextCompat.getColorStateList(requireContext(), R.color.accentGood)
+                    ColorStateList.valueOf(resolveAttrColor(R.attr.accentGood))
             } else {
                 // Theme-aware "empty" tint: white is invisible on the light theme's
                 // background, so use the adaptive on-surface-variant color instead.
@@ -1488,6 +1555,72 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                 dot.backgroundTintList =
                     ColorStateList.valueOf(resolveAttrColor(R.attr.primaryLightColorText))
             }
+        }
+        // Pop the newly-filled pill when a location was added (never on load,
+        // removal, or when the scale itself is hidden). lastFilledCapacity is
+        // -1 right after a (re)load, suppressing the pop until the next user
+        // action changes the count.
+        if (lastFilledCapacity in 0..<filled &&
+            filled in 1..dots.size &&
+            b.locationCapacityIndicator.isVisible &&
+            !isLoading
+        ) {
+            popCapacityDot(dots[filled - 1])
+            emitCapacityBubbles(dots[filled - 1])
+        }
+        lastFilledCapacity = filled
+    }
+
+    /** Small overshoot pop on a capacity pill that just filled. */
+    private fun popCapacityDot(dot: View) {
+        if (isReducedMotionPreferred()) return
+        dot.animate().cancel()
+        dot.scaleX = 0.4f
+        dot.scaleY = 0.4f
+        dot.animate()
+            .scaleX(1f).scaleY(1f)
+            .setDuration(260)
+            .setInterpolator(OvershootInterpolator(1.6f))
+            .start()
+    }
+
+    /**
+     * Emits a couple of tiny accent bubbles that drift up and fade from a
+     * just-filled capacity pill.
+     */
+    private fun emitCapacityBubbles(dot: View) {
+        if (isReducedMotionPreferred()) return
+        val overlay = b.fxOverlay
+        if (overlay.width <= 0 || overlay.height <= 0) return
+        val color = resolveAttrColor(R.attr.accentGood)
+        val loc = IntArray(2)
+        dot.getLocationOnScreen(loc)
+        val rootLoc = IntArray(2)
+        overlay.getLocationOnScreen(rootLoc)
+        val baseX = loc[0] + dot.width / 2f - rootLoc[0]
+        val baseY = (loc[1] - rootLoc[1]).toFloat()
+
+        repeat(CAPACITY_BUBBLE_COUNT) { i ->
+            val bubble = View(requireContext()).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(color)
+                }
+                alpha = 0.7f
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }
+            val size = dpPx(4)
+            bubble.layoutParams = FrameLayout.LayoutParams(size, size)
+            overlay.addView(bubble)
+            bubble.translationX = baseX - size / 2f + (i - (CAPACITY_BUBBLE_COUNT - 1) / 2f) * dpPx(6)
+            bubble.translationY = baseY
+            bubble.animate()
+                .translationY(baseY - dpPx(14))
+                .alpha(0f)
+                .setStartDelay(60L * i)
+                .setDuration(520)
+                .withEndAction { if (isAdded) overlay.removeView(bubble) }
+                .start()
         }
     }
 
@@ -1503,11 +1636,193 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             .start()
     }
 
+    // --- dolphin fx (connect arc, refresh swim, capacity pop) ---
+
+    private fun dpPx(v: Int): Int = (v * resources.displayMetrics.density + 0.5f).toInt()
+
+    /**
+     * Light physical confirmation for accepted state-changing actions
+     * (relay toggle, location selection). No-op when no view is attached.
+     */
+    private fun hapticTap() {
+        view?.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+    }
+
+    /**
+     * Connect celebration: a small dolphin swims a shallow arc from the top of
+     * the selected-locations list (where the new location card just landed) up
+     * to the hero status dot, which pulses on arrival. Never plays under
+     * reduced motion, and a still-running arc is replaced, never queued.
+     */
+    private fun playConnectArc() {
+        if (!isAdded || view == null) return
+        if (isReducedMotionPreferred()) return
+        val overlay = b.fxOverlay
+        if (overlay.width <= 0 || overlay.height <= 0) return
+
+        connectArcAnimator?.cancel()
+
+        val rootLoc = IntArray(2)
+        overlay.getLocationOnScreen(rootLoc)
+        val from = IntArray(2)
+        b.rvSelectedServers.getLocationOnScreen(from)
+        val to = IntArray(2)
+        b.statusIndicator.getLocationOnScreen(to)
+
+        val startX = from[0] + b.rvSelectedServers.width / 2f - rootLoc[0]
+        val startY = (from[1] + dpPx(28) - rootLoc[1]).toFloat()
+        val endX = to[0] + b.statusIndicator.width / 2f - rootLoc[0]
+        val endY = (to[1] + b.statusIndicator.height / 2f - rootLoc[1]).toFloat()
+
+        val dolphin = AppCompatImageView(requireContext()).apply {
+            setImageResource(R.drawable.dolphin_secure)
+            layoutParams = FrameLayout.LayoutParams(dpPx(28), dpPx(22))
+            alpha = 0f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        overlay.addView(dolphin)
+        dolphin.translationX = startX
+        dolphin.translationY = startY
+
+        // control point sits above the straight-line midpoint so the travel
+        // reads as a leap rather than a slide
+        val swimPath = Path().apply {
+            moveTo(startX, startY)
+            quadTo(
+                (startX + endX) / 2f,
+                minOf(startY, endY) - dpPx(56),
+                endX,
+                endY
+            )
+        }
+        val swim = ObjectAnimator.ofFloat(
+            dolphin,
+            View.TRANSLATION_X,
+            View.TRANSLATION_Y,
+            swimPath
+        ).apply {
+            duration = CONNECT_ARC_DURATION_MS
+            interpolator = PathInterpolator(0.2f, 0.7f, 0.3f, 1f)
+        }
+        val fadeIn = ObjectAnimator.ofFloat(dolphin, View.ALPHA, 0f, 0.9f).apply {
+            duration = CONNECT_ARC_DURATION_MS / 3
+        }
+
+        connectArcAnimator = AnimatorSet().apply {
+            playTogether(swim, fadeIn)
+            addListener(object : AnimatorListenerAdapter() {
+                private var cancelled = false
+
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    connectArcAnimator = null
+                    if (isAdded) overlay.removeView(dolphin)
+                    if (!cancelled && isAdded) pulseStatusDot()
+                }
+            })
+            start()
+        }
+    }
+
+    /** One-shot pulse on the hero status dot (arrival beat of the connect arc). */
+    private fun pulseStatusDot() {
+        if (!isAdded || isReducedMotionPreferred()) return
+        b.statusIndicator.animate().cancel()
+        b.statusIndicator.scaleX = 1f
+        b.statusIndicator.scaleY = 1f
+        b.statusIndicator.animate()
+            .scaleX(1.9f).scaleY(1.9f)
+            .setDuration(140)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                if (isAdded) {
+                    b.statusIndicator.animate()
+                        .scaleX(1f).scaleY(1f)
+                        .setDuration(200)
+                        .setInterpolator(OvershootInterpolator(1.2f))
+                        .start()
+                }
+            }
+            .start()
+    }
+
+    /**
+     * While a pull-to-refresh is in flight, a random dolphin swims repeated
+     * left-to-right passes with a gentle bob, just below the hero card.
+     */
+    private fun startRefreshSwim() {
+        if (!isAdded || view == null) return
+        if (isReducedMotionPreferred()) return
+        if (refreshSwimAnimator?.isRunning == true) return
+        val overlay = b.fxOverlay
+        if (overlay.width <= 0 || overlay.height <= 0) return
+
+        val dolphin = AppCompatImageView(requireContext()).apply {
+            setImageResource(EmbeddedDolphinContent.DOLPHINS.random())
+            layoutParams = FrameLayout.LayoutParams(dpPx(36), dpPx(30))
+            alpha = 0.75f
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        overlay.addView(dolphin)
+
+        val heroLoc = IntArray(2)
+        b.statusCard.getLocationOnScreen(heroLoc)
+        val rootLoc = IntArray(2)
+        overlay.getLocationOnScreen(rootLoc)
+        val baseY = (heroLoc[1] + b.statusCard.height - rootLoc[1]) + dpPx(10)
+        val fromX = -dpPx(40).toFloat()
+        val toX = overlay.width + dpPx(40).toFloat()
+
+        dolphin.translationY = baseY.toFloat()
+        val travel = ObjectAnimator.ofFloat(dolphin, View.TRANSLATION_X, fromX, toX).apply {
+            duration = REFRESH_SWIM_DURATION_MS
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.RESTART
+            interpolator = LinearInterpolator()
+        }
+        val bob = ObjectAnimator.ofFloat(
+            dolphin,
+            View.TRANSLATION_Y,
+            baseY.toFloat(),
+            (baseY - dpPx(6)).toFloat()
+        ).apply {
+            duration = 500
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+        }
+        refreshSwimAnimator = AnimatorSet().apply {
+            playTogether(travel, bob)
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    refreshSwimAnimator = null
+                    if (isAdded) overlay.removeView(dolphin)
+                }
+            })
+            start()
+        }
+    }
+
+    /** Stops the pull-to-refresh swim; cancelling removes the dolphin. */
+    private fun stopRefreshSwim() {
+        refreshSwimAnimator?.cancel()
+        refreshSwimAnimator = null
+    }
+
     private fun setupNavigationButtons() {
         b.supportBtn.setOnClickListener { openAccount() }
         b.settingsBtn.setOnClickListener { showServerSettingsBottomSheet() }
         b.fabStopProxy.setOnClickListener  { onToggleProxyFabClicked() }
         b.fabStartProxy.setOnClickListener { onToggleProxyFabClicked() }
+        // Collapsed-bar search pill: jump to (and focus) the real search field so
+        // the user can search without scrolling back up. Ignored while the
+        // search field is disabled (initial load, reset in progress, stopped).
+        b.collapsedSearchPill.setOnClickListener {
+            if (!isAdded || !b.searchCard.isEnabled) return@setOnClickListener
+            focusLocationSearch()
+        }
         // Status chip: open settings when running, show a hint when stopped
         b.statusChip.setOnClickListener {
             if (isProxyStopped) {
@@ -1579,11 +1894,11 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                 emptyList()
             }
             val total = apps.size
-            val notBypassed = apps.count { !it.isProxyExcluded }
+            val bypassed = apps.count { it.isProxyExcluded }
             uiCtx {
                 if (!isAdded) return@uiCtx
                 b.qsBypassAppsState.text =
-                    String.format(Locale.US, "%d/%d", notBypassed, total)
+                    String.format(Locale.US, "%d/%d", bypassed, total)
             }
         }
     }
@@ -1596,15 +1911,11 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
     private fun refreshStatsTileState() {
         io {
             val count = try {
-                val proxyId = VpnController.getWinProxyId()
-                if (proxyId.isNullOrBlank()) {
-                    0
-                } else {
-                    connectionTrackerDAO.getRpnConnStats(
-                        proxyId,
-                        System.currentTimeMillis() - TimeUnit.HOURS.toMillis(24)
-                    ).connectionsCount
-                }
+                val proxyId = Backend.RpnWin
+                connectionTrackerDAO.getRpnConnStats(
+                    proxyId,
+                    System.currentTimeMillis() - TimeUnit.HOURS.toMillis(24)
+                ).connectionsCount
             } catch (e: Exception) {
                 Logger.w(LOG_TAG_UI, "$TAG.refreshStatsTileState: ${e.message}")
                 0
@@ -1658,7 +1969,24 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
      */
     private fun applyRelayTileUi(relayOnCount: Int, totalCount: Int) {
         if (!isAdded) return
-        b.qsRelayState.text = String.format(Locale.US, "%d/%d", relayOnCount, totalCount)
+        val caption = String.format(Locale.US, "%d/%d", relayOnCount, totalCount)
+        b.qsRelayState.text = caption
+        // pop the count when it actually changes so the eye is drawn to the
+        // new state (skipped on first bind, reloads, and reduced motion)
+        if (lastRelayCaption != null &&
+            caption != lastRelayCaption &&
+            !isReducedMotionPreferred()
+        ) {
+            b.qsRelayState.animate().cancel()
+            b.qsRelayState.scaleX = 0.7f
+            b.qsRelayState.scaleY = 0.7f
+            b.qsRelayState.animate()
+                .scaleX(1f).scaleY(1f)
+                .setDuration(220)
+                .setInterpolator(OvershootInterpolator(1.5f))
+                .start()
+        }
+        lastRelayCaption = caption
         val allOn = totalCount > 0 && relayOnCount == totalCount
         if (allOn) {
             val onColor = resolveAttrColor(R.attr.chipTextPositive)
@@ -1704,6 +2032,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             showToast(getString(R.string.qs_relay_no_locations_toast))
             return
         }
+        hapticTap()
 
         val target = !isRelayAllOn
         if (!target) {
@@ -1743,6 +2072,8 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
     private fun startRelayBulkToggle(target: Boolean) {
         if (relayToggleInFlight) return
         relayToggleInFlight = true
+        startRelayToggleAnimation()
+        val startedAt = System.currentTimeMillis()
 
         io {
             val toUpdate = try {
@@ -1763,8 +2094,17 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                 }
             }
 
+            // The backend round-trip can finish in tens of milliseconds; hold
+            // the orbit up for a perceptible beat regardless so the in-flight
+            // feedback is never just a single invisible frame.
+            val elapsed = System.currentTimeMillis() - startedAt
+            if (elapsed < MIN_RELAY_ORBIT_MS) {
+                delay(MIN_RELAY_ORBIT_MS - elapsed)
+            }
+
             uiCtx {
                 relayToggleInFlight = false
+                stopRelayToggleAnimation(settle = isAdded)
                 if (!isAdded) return@uiCtx
                 if (failures > 0) {
                     showToast(getString(R.string.qs_relay_failure_toast, failures))
@@ -1778,6 +2118,125 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
                 refreshRelayTileState()
             }
         }
+    }
+
+    /**
+     * In-flight feedback for a bulk relay toggle: a small dolphin fades in
+     * and orbits the tile ring (counter-rotated so the artwork stays upright)
+     * — the hop icon itself never spins, keeping the tile legible. The orbit
+     * is held for at least [MIN_RELAY_ORBIT_MS] so fast toggles still read.
+     */
+    private fun startRelayToggleAnimation() {
+        if (!isAdded) return
+        if (isReducedMotionPreferred()) return
+        if (relayOrbitAnimator?.isRunning == true) return
+
+        val tile = b.qsRelayTile
+        // drop any stale orbit left over from a torn-down previous run
+        relayOrbitView?.let { tile.removeView(it) }
+        relayOrbitView = null
+
+        val orbit = FrameLayout(requireContext()).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            isClickable = false
+            isFocusable = false
+        }
+        // parked one ring-radius above center; rotating the wrapper sends it
+        // around the hop icon without the icon itself moving
+        val dolphin = AppCompatImageView(requireContext()).apply {
+            setImageResource(R.drawable.dolphin_free)
+            layoutParams = FrameLayout.LayoutParams(dpPx(14), dpPx(11), Gravity.CENTER)
+            translationY = -dpPx(12).toFloat()
+            alpha = 0f
+        }
+        orbit.addView(dolphin)
+        tile.addView(orbit)
+        relayOrbitView = orbit
+
+        val fadeIn = ObjectAnimator.ofFloat(dolphin, View.ALPHA, 0f, 0.95f).apply {
+            duration = 180
+        }
+        val lap = ObjectAnimator.ofFloat(orbit, View.ROTATION, 0f, 360f).apply {
+            duration = RELAY_ORBIT_DURATION_MS
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator()
+        }
+        // counter-rotate the artwork so it stays upright while circling
+        val upright = ObjectAnimator.ofFloat(dolphin, View.ROTATION, 0f, -360f).apply {
+            duration = RELAY_ORBIT_DURATION_MS
+            repeatCount = ObjectAnimator.INFINITE
+            interpolator = LinearInterpolator()
+        }
+        relayOrbitAnimator = AnimatorSet().apply {
+            playTogether(fadeIn, lap, upright)
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    relayOrbitAnimator = null
+                }
+            })
+            start()
+        }
+    }
+
+    /**
+     * Ends the relay orbit: the dolphin dives into the tile center and fades,
+     * the tile pops once as the result lands, and the orbit wrapper is
+     * removed. Teardown paths skip straight to removal.
+     */
+    private fun stopRelayToggleAnimation(settle: Boolean) {
+        val animator = relayOrbitAnimator
+        val orbit = relayOrbitView
+        relayOrbitAnimator = null
+        if (animator != null) animator.cancel()
+        if (orbit == null) return
+        val tile = b.qsRelayTile
+        val dolphin = orbit.getChildAt(0)
+
+        if (!isAdded || !settle || dolphin == null || isReducedMotionPreferred()) {
+            tile.removeView(orbit)
+            relayOrbitView = null
+            return
+        }
+
+        dolphin.animate().cancel()
+        dolphin.animate()
+            .translationY(0f)
+            .scaleX(0.2f).scaleY(0.2f)
+            .alpha(0f)
+            .setDuration(260)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                if (isAdded) {
+                    tile.removeView(orbit)
+                    relayOrbitView = null
+                }
+            }
+            .start()
+        popRelayTile()
+    }
+
+    /** Small overshoot pop on the relay tile (result-landed beat). */
+    private fun popRelayTile() {
+        if (!isAdded || isReducedMotionPreferred()) return
+        b.qsRelayTile.animate().cancel()
+        b.qsRelayTile.animate()
+            .scaleX(1.1f).scaleY(1.1f)
+            .setDuration(120)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                if (isAdded) {
+                    b.qsRelayTile.animate()
+                        .scaleX(1f).scaleY(1f)
+                        .setDuration(200)
+                        .setInterpolator(OvershootInterpolator(1.4f))
+                        .start()
+                }
+            }
+            .start()
     }
 
     /** Opens the bypass-apps screen (apps excluded from RPN via FirewallManager). */
@@ -2285,11 +2744,6 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             .setInterpolator(AccelerateDecelerateInterpolator())
             .start()
 
-        // The error card itself carries the themed sad dolphin, so hide the
-        // dolphin signature at the bottom of the screen: one sad dolphin per
-        // screen reads cleaner than two competing for attention. It comes
-        // back in hideErrorState().
-        b.dolphinSignature.isVisible = false
         startErrorDolphinAnimation()
 
         if (noTunnel) {
@@ -2361,10 +2815,6 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         b.settingsBtn.isVisible = true
         b.statusCard.isVisible = true
         updateVpnStatus()
-        // Recovered from the error/empty state; bring the signature back with
-        // a fresh regular (non-failure) pairing.
-        b.dolphinSignature.isVisible = true
-        b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
         b.searchCard.isEnabled = true
         b.searchBar.isEnabled = true
         if (!isProxyStopped) updateCapacityIndicator()
@@ -2408,7 +2858,9 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         if (!isAdded) return
         Logger.i(LOG_TAG_UI, "$TAG.startRethinkFromErrorCard: requesting VPN start")
         errorTunnelWaitJob?.cancel()
-        VpnController.start(requireContext(), true)
+        // user-initiated: never pass autoAttempt=true, it drops the start
+        // request when the service is alive without a tunnel
+        VpnController.start(requireContext())
 
         b.errorRetryBtn.isEnabled = false
         b.errorRetryBtn.isClickable = false
@@ -2841,7 +3293,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             )
             chipStrokeWidth = 1f * density
             // Compact but accessible touch target, matching the frequent-country chips.
-            chipMinHeight = 36f * density
+            chipMinHeight = 40f * density
             chipStartPadding = 12f * density
             chipEndPadding = 12f * density
         }
@@ -2908,6 +3360,7 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
             unselectedServers.removeAll { it.key == server.key }
             // Mark this key as "loading" so the adapter item shows "Connecting…" pulse.
             selectedAdapter.addLoadingTunnelKey(server.key)
+            hapticTap()
             refreshAfterSelectionChange()
 
             io {
@@ -2929,6 +3382,9 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
 
                     // clear the "Connecting…" indicator.
                     selectedAdapter.clearLoadingTunnelKey(server.key)
+                    // Signature moment: a dolphin arcs from the location's new
+                    // card up to the hero status dot to celebrate the connect.
+                    playConnectArc()
                     Logger.v(LOG_TAG_UI, "$TAG.onServerSelected: best: $best, grouped: $grouped")
                 }
             }
@@ -3156,28 +3612,22 @@ class ServerSelectionFragment : Fragment(R.layout.fragment_server_selection),
         chip.isCheckable = false
         chip.isCloseIconVisible = false
 
-        // Background: subtle positive tint.
-        val bgColor = UIUtils.fetchColor(requireContext(), R.attr.chipBgColorPositive)
+        // Neutral surface styling: these chips are navigation shortcuts, not
+        // status indicators, so the positive (green) accents are reserved for
+        // genuinely connected states elsewhere on the screen.
+        val bgColor = UIUtils.fetchColor(requireContext(), R.attr.colorSurfaceVariant)
         chip.chipBackgroundColor = android.content.res.ColorStateList.valueOf(bgColor)
 
         val textColor = UIUtils.fetchColor(requireContext(), R.attr.primaryTextColor)
         chip.setTextColor(textColor)
         chip.textSize = 13f
 
-        // Stroke: green accent at 35 % opacity.
+        val strokeColor = UIUtils.fetchColor(requireContext(), R.attr.border)
         chip.chipStrokeWidth = 1f * density
-        val strokeBaseColor = UIUtils.fetchColor(requireContext(), R.attr.accentGood)
-        chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(
-            Color.argb(
-                (255 * 0.35f).toInt(),
-                Color.red(strokeBaseColor),
-                Color.green(strokeBaseColor),
-                Color.blue(strokeBaseColor)
-            )
-        )
+        chip.chipStrokeColor = android.content.res.ColorStateList.valueOf(strokeColor)
 
         // Compact but accessible sizing.
-        chip.chipMinHeight = 36f * density
+        chip.chipMinHeight = 40f * density
         chip.chipStartPadding = 12f * density
         chip.chipEndPadding = 12f * density
 

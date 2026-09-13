@@ -14,29 +14,17 @@
     android:paddingEnd="16dp"
     android:paddingBottom="10dp">
 
-    <androidx.appcompat.widget.AppCompatTextView
-        android:id="@+id/tv_flag"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:background="@drawable/bg_server_avatar_circle"
-        android:gravity="center"
-        android:textSize="21sp"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:text="🇺🇸" />
-
-    <androidx.appcompat.widget.AppCompatImageView
-        android:id="@+id/iv_flag_image"
-        android:layout_width="42dp"
-        android:layout_height="42dp"
-        android:alpha="0.9"
-        android:padding="11dp"
-        android:src="@drawable/ic_rpn_auto"
-        android:tint="?attr/primaryTextColor"
+    <com.celzero.bravedns.ui.custom.FlagWatermarkView
+        android:id="@+id/flag_watermark"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:importantForAccessibility="no"
         android:visibility="gone"
+        tools:visibility="visible"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        tools:visibility="gone" />
+        app:layout_constraintTop_toTopOf="parent" />
 
     <androidx.appcompat.widget.AppCompatImageView
         android:id="@+id/refresh_stop_icon"
@@ -55,11 +43,10 @@
         android:id="@+id/country_info_layout"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="14dp"
         android:layout_marginEnd="6dp"
         android:orientation="vertical"
         app:layout_constraintEnd_toStartOf="@id/refresh_stop_icon"
-        app:layout_constraintStart_toEndOf="@id/tv_flag"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
         <LinearLayout
@@ -139,7 +126,6 @@
         android:id="@+id/apps_action_container"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="12dp"
         android:layout_marginTop="12dp"
         android:background="@drawable/bg_vpn_server_chip"
         android:clickable="true"
@@ -150,7 +136,7 @@
         android:paddingTop="6dp"
         android:paddingEnd="8dp"
         android:paddingBottom="6dp"
-        app:layout_constraintStart_toEndOf="@id/tv_flag"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/country_info_layout">
 
         <androidx.appcompat.widget.AppCompatTextView

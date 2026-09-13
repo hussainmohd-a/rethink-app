@@ -38,6 +38,7 @@ import android.widget.LinearLayout
 import androidx.annotation.DrawableRes
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.appcompat.widget.AppCompatTextView
+import androidx.core.widget.NestedScrollView
 import com.celzero.bravedns.R
 
 /**
@@ -92,6 +93,24 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
     private var preDrawListener: ViewTreeObserver.OnPreDrawListener? = null
     private val visibleRect = Rect()
 
+    /**
+     * Host scroll view for overlay mode (see [revealAtScrollEndOf]); null
+     * when the signature flows inline at the end of the content.
+     */
+    private var scrollHost: NestedScrollView? = null
+
+    /** Overlay mode only: true while the mark is currently revealed. */
+    private var overlayShown = false
+
+    /**
+     * Overlay mode only: when true the mark is force-hidden regardless of
+     * scroll position (e.g. while a screen is still loading its content).
+     */
+    private var overlaySuppressed = false
+
+    /** Guards double registration of the shared window watchers. */
+    private var windowWatchersAdded = false
+
     init {
         orientation = VERTICAL
         gravity = Gravity.CENTER_HORIZONTAL
@@ -137,6 +156,11 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        if (scrollHost != null) {
+            // overlay mode: window-wide scroll and layout changes drive the
+            // reveal, so the shared watchers must stay registered
+            addWindowWatchers()
+        }
         if (entrancePlayed) return
         if (!entrancePending) {
             if (isReducedMotionPreferred()) {
@@ -150,10 +174,11 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         removePreDrawListener()
-        removeEntranceWatchers()
+        forceRemoveWindowWatchers()
         // a swim or cycle interrupted by the view going away settles
         // instantly; the hidden/pending state survives so a genuine
         // re-attach can still play the entrance
+        animate().cancel()
         entranceAnimator?.cancel()
         entranceAnimator = null
         cycleAnimator?.cancel()
@@ -169,7 +194,7 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
      * [EmbeddedDolphinContent.Signature].
      */
     fun setContent(@DrawableRes image: Int, quote: String) {
-        retireEntrance()
+        retireEntranceIfPlayed()
         current = null
         dolphinView.setImageResource(image)
         quoteView.text = quote
@@ -177,7 +202,7 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
 
     /** Renders [signature] and lets taps cycle to its successor. */
     fun setContent(signature: EmbeddedDolphinContent.Signature) {
-        retireEntrance()
+        retireEntranceIfPlayed()
         current = signature
         dolphinView.setImageResource(signature.image)
         quoteView.text = context.getString(signature.quote)
@@ -219,8 +244,7 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
             if (visible) {
                 playEntrance()
             } else {
-                viewTreeObserver.addOnScrollChangedListener(this)
-                viewTreeObserver.addOnGlobalLayoutListener(this)
+                addWindowWatchers()
             }
             true
         }
@@ -228,12 +252,91 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
         viewTreeObserver.addOnPreDrawListener(listener)
     }
 
+    /**
+     * Overlay mode: instead of flowing after the scroll content, the
+     * signature parks itself a little above the bottom edge of its parent
+     * (place it bottom-anchored in the screen root) and is revealed — with a
+     * short crossfade — only while [host] is scrolled to, or near, its end.
+     * Content shorter than the viewport counts as being at the end. The
+     * first reveal also plays the swim-in entrance. Call once from
+     * onViewCreated; the placement must be bottom-anchored, not inline.
+     */
+    fun revealAtScrollEndOf(host: NestedScrollView) {
+        scrollHost = host
+        overlayShown = false
+        visibility = View.GONE
+        // evaluate once the host has laid out; the shared window watchers
+        // registered at attach drive every update after that
+        host.post { updateOverlayVisibility() }
+    }
+
+    /**
+     * Overlay mode only: force-hides the mark while [suppress] is true
+     * (loading states), resuming normal scroll-end behaviour after.
+     */
+    fun suppressOverlay(suppress: Boolean) {
+        overlaySuppressed = suppress
+        if (suppress) {
+            setRevealed(false)
+        } else {
+            updateOverlayVisibility()
+        }
+    }
+
     override fun onScrollChanged() {
+        updateOverlayVisibility()
         maybePlayEntrance()
     }
 
     override fun onGlobalLayout() {
+        updateOverlayVisibility()
         maybePlayEntrance()
+    }
+
+    /**
+     * Overlay-mode reveal computation: visible when the host's remaining
+     * scroll distance is within a quarter of its viewport (or when the
+     * content does not scroll at all).
+     */
+    private fun updateOverlayVisibility() {
+        val host = scrollHost ?: return
+        if (!isAttachedToWindow) return
+        if (overlaySuppressed) {
+            setRevealed(false)
+            return
+        }
+        val viewport = host.height - host.paddingTop - host.paddingBottom
+        val show = if (viewport <= 0) {
+            false
+        } else {
+            val content = host.getChildAt(0)
+            val remaining = content?.let {
+                it.height - host.paddingTop - host.paddingBottom - (host.scrollY + viewport)
+            } ?: 0
+            remaining <= viewport * SCROLL_END_FRACTION
+        }
+        setRevealed(show)
+    }
+
+    /** Crossfades the overlay in/out; cancelling never strands a hide callback. */
+    private fun setRevealed(show: Boolean) {
+        if (overlayShown == show) return
+        overlayShown = show
+        animate().cancel()
+        if (show) {
+            if (visibility != View.VISIBLE) visibility = View.VISIBLE
+            if (alpha < 1f) {
+                animate().alpha(1f).setDuration(OVERLAY_FADE_MS).start()
+            }
+        } else {
+            animate()
+                .alpha(0f)
+                .setDuration(OVERLAY_FADE_MS)
+                .withEndAction {
+                    if (isAttachedToWindow) visibility = View.GONE
+                }
+                .start()
+        }
     }
 
     private fun maybePlayEntrance() {
@@ -368,6 +471,18 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
     }
 
     /**
+     * Retires the entrance only once it has already run (or been skipped).
+     * Hosts set content in onCreate/onViewCreated, before the view attaches:
+     * retiring unconditionally there would mark the entrance as played and
+     * the swim-in would never be armed. Leaving a still-pending entrance
+     * intact lets it play later, when the signature scrolls into view, with
+     * the freshly-set content.
+     */
+    private fun retireEntranceIfPlayed() {
+        if (entrancePlayed) retireEntrance()
+    }
+
+    /**
      * Tap-to-cycle transition: the dolphin dips up a few dp with a small
      * tilt as the current pairing recedes, the next artwork and quote swap
      * in at the top of the dip, then the dolphin drops back with a slight
@@ -421,7 +536,21 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
             )
         }
 
+        // swap the artwork and quote at the top of the dip so the new
+        // pairing is what drops back into place
+        out.addListener(object : AnimatorListenerAdapter() {
+            override fun onAnimationEnd(animation: Animator) {
+                dolphinView.setImageResource(next.image)
+                quoteView.text = context.getString(next.quote)
+            }
+        })
+
+        // the outer set must be the one started: it drives the out-then-back
+        // sequence and its end listener is what clears isCycling — starting
+        // only the children would leave it stuck true, swallowing every
+        // later tap, and would also make cancellation of this field a no-op
         cycleAnimator = AnimatorSet().apply {
+            play(out).before(backIn)
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     cycleAnimator = null
@@ -429,16 +558,7 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
                     settleToFinalState()
                 }
             })
-            // swap the artwork and quote at the top of the dip so the new
-            // pairing is what drops back into place
-            out.addListener(object : AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: Animator) {
-                    dolphinView.setImageResource(next.image)
-                    quoteView.text = context.getString(next.quote)
-                    backIn.start()
-                }
-            })
-            out.start()
+            start()
         }
     }
 
@@ -452,7 +572,26 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
         }
     }
 
+    /** Registers the shared window scroll/layout watchers at most once. */
+    private fun addWindowWatchers() {
+        if (windowWatchersAdded) return
+        windowWatchersAdded = true
+        viewTreeObserver.addOnScrollChangedListener(this)
+        viewTreeObserver.addOnGlobalLayoutListener(this)
+    }
+
+    /**
+     * Drops the watchers once they are no longer needed. Overlay mode keeps
+     * them registered for the whole lifetime — they drive the reveal — so
+     * this becomes a no-op there; only detach removes them for real.
+     */
     private fun removeEntranceWatchers() {
+        if (scrollHost != null) return
+        forceRemoveWindowWatchers()
+    }
+
+    private fun forceRemoveWindowWatchers() {
+        windowWatchersAdded = false
         try {
             viewTreeObserver.removeOnScrollChangedListener(this)
             viewTreeObserver.removeOnGlobalLayoutListener(this)
@@ -520,5 +659,11 @@ class EmbeddedDolphinSignature @JvmOverloads constructor(
         private const val CYCLE_TILT_DEG = -6f
         private const val CYCLE_TILT_SETTLE_DEG = 2f
         private const val CYCLE_QUOTE_OFFSET_DP = 2
+
+        // overlay mode: crossfade duration for show/hide and the fraction of
+        // the viewport's remaining scroll distance within which the mark is
+        // revealed (content that cannot scroll counts as "at the end")
+        private const val OVERLAY_FADE_MS = 200L
+        private const val SCROLL_END_FRACTION = 0.25f
     }
 }

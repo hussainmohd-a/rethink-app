@@ -120,9 +120,10 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
         setDolphinSignature()
     }
 
-    /** Dolphin signature (at the end of the dashboard content.); random pairing, fresh on every visit. */
+    /** Dolphin signature: bottom overlay revealed at the end of the dashboard scroll. */
     private fun setDolphinSignature() {
         b.dolphinSignature.setContent(EmbeddedDolphinContent.random())
+        b.dolphinSignature.revealAtScrollEndOf(b.dashboardContainer)
     }
 
     override fun onResume() {
@@ -157,7 +158,7 @@ class RethinkPlusDashboardFragment : Fragment(R.layout.fragment_rethink_plus_das
         val fmt = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
         val model = SubscriptionUiStateResolver.resolve(state, sub)
 
-        val colorGood = UIUtils.fetchColor(requireContext(), R.attr.accentGood)
+        val colorGood = UIUtils.fetchColor(requireContext(), R.attr.chipTextPositive)
         val colorBad = UIUtils.fetchColor(requireContext(), R.attr.accentBad)
         val colorDim = UIUtils.fetchColor(requireContext(), R.attr.primaryLightColorText)
 
