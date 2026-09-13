@@ -81,7 +81,7 @@
                                 <androidx.appcompat.widget.AppCompatTextView
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:text="@string/symbol_rocket"
+                                    android:text="@string/symbol_infinity"
                                     android:textSize="@dimen/default_font_text_view"
                                     android:textColor="?attr/colorOnSurface"
                                     android:alpha="0.75"/>
@@ -229,10 +229,9 @@
 
                     <com.celzero.bravedns.ui.custom.MoneyBackBadgeView
                         android:id="@+id/money_back_badge"
-                        android:layout_width="72dp"
-                        android:layout_height="72dp"
-                        android:layout_gravity="top|end"
-                        android:layout_marginTop="8dp"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_gravity="center|right"
                         android:layout_marginEnd="8dp" />
                 </FrameLayout>
             </com.google.android.material.card.MaterialCardView>
