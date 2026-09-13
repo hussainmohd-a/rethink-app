@@ -88,6 +88,13 @@
     <color name="serverHeaderGradientCenterLight">#DEEDFC</color>
     <color name="serverHeaderGradientEndLight">#CCE3FA</color>
 
+    <!-- Hero watermark dolphin: same hue family as the header gradient but a
+         deliberate shade step brighter (dark) / deeper (light) so the mark
+         stays visible on the gradient. Alpha is baked into the color. -->
+    <color name="heroWatermarkTintDark">#4A1DE9B6</color>
+    <color name="heroWatermarkTintTrueBlack">#401DE9B6</color>
+    <color name="heroWatermarkTintLight">#614A8FC7</color>
+
     <!-- theme light -->
     <color name="colorPrimaryLight">#ececec</color>
     <color name="colorPrimaryDarkLight">#1e88e5</color>
