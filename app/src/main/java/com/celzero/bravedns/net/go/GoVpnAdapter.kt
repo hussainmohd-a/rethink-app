@@ -3584,6 +3584,10 @@ class GoVpnAdapter : KoinComponent {
         // the tunnel handles concurrent transport additions; fire them off without
         // awaiting completion. each job logs its own success/failure.
         dohList.forEach { doh ->
+            if (!tunnel.isConnected) {
+                Logger.e(LOG_TAG_VPN, "$TAG; smart-dns; no tunnel, skip set multi dns as plus")
+                return
+            }
             io {
                 try {
                     var url = doh.dohURL
@@ -3616,6 +3620,10 @@ class GoVpnAdapter : KoinComponent {
 
         // DoT endpoints
         dots.forEach { dot ->
+            if (!tunnel.isConnected) {
+                Logger.e(LOG_TAG_VPN, "$TAG; smart-dns; no tunnel, skip set multi dns as plus")
+                return
+            }
             io {
                 var url: String? = null
                 try {
