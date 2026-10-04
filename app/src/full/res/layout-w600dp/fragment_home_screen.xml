@@ -554,16 +554,18 @@
 
                 <androidx.constraintlayout.widget.ConstraintLayout
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="12dp">
 
                     <LinearLayout
                         android:id="@+id/fhs_apps_count_container"
-                        android:layout_width="wrap_content"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:gravity="bottom"
                         android:orientation="horizontal"
+                        android:layout_marginEnd="4dp"
+                        app:layout_constraintEnd_toStartOf="@id/fhs_apps_arrow"
                         app:layout_constraintStart_toStartOf="parent"
                         app:layout_constraintTop_toTopOf="parent">
 
@@ -571,7 +573,9 @@
                             android:id="@+id/fhs_card_allowed_apps"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
+                            android:ellipsize="end"
                             android:fontFamily="monospace"
+                            android:maxLines="1"
                             tools:text="459"
                             android:textColor="?attr/primaryTextColor"
                             android:textSize="@dimen/home_screen_stat_text" />
@@ -581,7 +585,9 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:alpha="0.8"
+                            android:ellipsize="end"
                             android:fontFamily="monospace"
+                            android:maxLines="1"
                             tools:text="/461"
                             android:textColor="?attr/primaryLightColorText"
                             android:textSize="@dimen/large_font_text_view" />
@@ -592,6 +598,8 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
                             android:alpha="0.8"
+                            android:ellipsize="end"
+                            android:maxLines="1"
                             android:text="@string/apps_info_title"
                             android:textAllCaps="true"
                             android:textColor="?attr/primaryLightColorText"
