@@ -70,6 +70,7 @@ import com.celzero.bravedns.ui.LauncherSwitcher
 import com.celzero.bravedns.ui.activity.AppLockActivity.Companion.APP_LOCK_ALIAS
 import com.celzero.bravedns.ui.activity.AppLockActivity.Companion.HOME_ALIAS
 import com.celzero.bravedns.ui.bottomsheet.BackupRestoreBottomSheet
+import com.celzero.bravedns.ui.bottomsheet.TaskerAutomationBottomSheet
 import com.celzero.bravedns.util.BubbleHelper
 import com.celzero.bravedns.util.Constants
 import com.celzero.bravedns.util.FirebaseErrorReporting
@@ -674,10 +675,7 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
         }
 
         b.settingsTaskerRl.setOnClickListener {
-            showAppTriggerPackageDialog(this , onPackageSet = { packageName ->
-                persistentState.appTriggerPackages = packageName
-                logEvent("App trigger package set to $packageName")
-            })
+            showTaskerAutomationBottomSheet()
         }
 
         b.settingsIpInfoRl.setOnClickListener {
@@ -843,7 +841,8 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
             }
 
             persistentState.goLoggerLevel = which.toLong()
-            GoVpnAdapter.setLogLevel(persistentState.goLoggerLevel.toInt(), includeFileTrace = persistentState.includeFileTrace)
+            Logger.uiLogLevel = which.toLong()
+            GoVpnAdapter.setLogLevel(persistentState.goLoggerLevel.toInt(), Logger.uiLogLevel.toInt(), persistentState.includeFileTrace)
             updateConfigLevel(persistentState.goLoggerLevel)
             val logLevel = if (persistentState.goLoggerLevel.toInt() == GO_LOG_LEVEL_EXTREME) GO_LOG_LEVEL_EXTREME_DISPLAY else persistentState.goLoggerLevel.toInt()
             b.genSettingsGoLogDesc.text = Logger.LoggerLevel.fromId(logLevel)?.name?.lowercase()
@@ -1024,6 +1023,17 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
           bottomSheetFragment.show(this.supportFragmentManager, bottomSheetFragment.tag)
       }
 
+      private fun showTaskerAutomationBottomSheet() {
+          if (this.isFinishing || this.isDestroyed) {
+              Logger.w(LOG_TAG_UI, "err opening tasker btmsheet, activity is destroyed")
+              return
+          }
+
+          val bottomSheetFragment = TaskerAutomationBottomSheet()
+          bottomSheetFragment.show(this.supportFragmentManager, TaskerAutomationBottomSheet.TAG)
+          logEvent("Tasker automation bottom sheet opened")
+      }
+
       private fun openConsoleLogActivity() {
           try {
               val intent = Intent(this, ConsoleLogActivity::class.java)
@@ -1032,61 +1042,6 @@ class MiscSettingsActivity : BaseActivity(R.layout.activity_misc_settings) {
               Logger.e(LOG_TAG_UI, "err opening console log activity ${e.message}", e)
           }
       }
-
-      fun showAppTriggerPackageDialog(context: Context, onPackageSet: (String) -> Unit) {
-          val editText = AppCompatEditText(context).apply {
-              hint = context.getString(R.string.adv_tasker_dialog_edit_hint)
-              inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-              setHorizontallyScrolling(true)
-              if (persistentState.appTriggerPackages.isNotEmpty()) {
-                  setText(persistentState.appTriggerPackages)
-              }
-            setPadding(50, 40, 50, 40)
-            gravity = Gravity.TOP or Gravity.START
-        }
-
-          val selectableTextView = AppCompatTextView(context).apply {
-              text = context.getString(R.string.adv_tasker_dialog_msg)
-              setTextIsSelectable(true)
-              setPadding(50, 40, 50, 0)
-              textSize = 16f
-          }
-
-          val instructionsTextView = AppCompatTextView(context).apply {
-              text = context.getString(R.string.adv_tasker_dialog_instructions)
-              setTextIsSelectable(true)
-              setPadding(50, 40, 50, 0)
-              textSize = 16f
-          }
-
-          // add a LinearLayout as the single child of the ScrollView, then add the text view and
-          // edit text to the LinearLayout.
-          val linearLayout = LinearLayout(context).apply {
-              orientation = LinearLayout.VERTICAL
-              addView(selectableTextView)
-              addView(editText)
-              addView(instructionsTextView)
-          }
-
-          val scrollView = ScrollView(context).apply {
-              setPadding(40, 10, 40, 0)
-              addView(linearLayout)
-          }
-
-          MaterialAlertDialogBuilder(context, R.style.App_Dialog_NoDim)
-              .setTitle(context.getString(R.string.adv_taster_title))
-              .setView(scrollView)
-              .setPositiveButton(context.getString(R.string.lbl_save)) { dialog, _ ->
-                  val pkgName = editText.text.toString().trim()
-                  if (pkgName.isNotEmpty()) {
-                      onPackageSet(pkgName)
-                  }
-                  dialog.dismiss()
-              }
-              .setNegativeButton(context.getString(R.string.lbl_cancel)) { dialog, _ -> dialog.cancel() }
-              .show()
-      }
-
 
     private fun Context.isDarkThemeOn(): Boolean {
         return resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
