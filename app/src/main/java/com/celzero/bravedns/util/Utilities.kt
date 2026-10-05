@@ -119,6 +119,9 @@ object Utilities {
 
     private var countryMap: CountryMap? = null
 
+    // SecureRandom is thread-safe; a single shared instance avoids per-call
+    private val secureRandom = SecureRandom()
+
     // convert an FQDN like "www.example.co.uk." to an eTLD + 1 like "example.co.uk".
     fun getETldPlus1(fqdn: String): String? {
         return try {
@@ -988,7 +991,6 @@ object Utilities {
     // generates a user-specified number of random bytes, converts it to hexadecimal, and then
     // provides the hexadecimal value as a string
     fun getRandomString(length: Int): String {
-        val secureRandom = SecureRandom()
         val random = ByteArray(length)
         secureRandom.nextBytes(random)
         // formats each byte as a two-character hexadecimal string

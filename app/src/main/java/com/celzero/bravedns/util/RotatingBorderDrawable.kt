@@ -105,6 +105,31 @@ class RotatingBorderDrawable : Drawable() {
         applyAccent(Color.HSVToColor(hsv))
     }
 
+    /**
+     * Per-frame combined update for animated callers: applies the highlight
+     * hue and rotation in a single pass so the color table and shader are
+     * rebuilt (and the drawable invalidated) at most once per invocation
+     * instead of once per property. Skips all work when neither wrapped value
+     * changed since the last frame.
+     */
+    fun setHighlightHueAndRotation(hueDegrees: Float, newRotationDegrees: Float) {
+        val wrappedRotation = ((newRotationDegrees % 360f) + 360f) % 360f
+        val wrappedHue = ((hueDegrees % 360f) + 360f) % 360f
+        val rotationChanged = wrappedRotation != rotationDegrees
+        val hueChanged = rainbow && wrappedHue != currentHue
+        if (!rotationChanged && !hueChanged) return
+        if (hueChanged) {
+            currentHue = wrappedHue
+            val hsv = floatArrayOf(wrappedHue, RAINBOW_SATURATION, RAINBOW_BRIGHTNESS)
+            accentColor = Color.HSVToColor(hsv)
+            transparentColor = ColorUtils.setAlphaComponent(accentColor, 0)
+            buildBaseColors()
+        }
+        this.rotationDegrees = wrappedRotation
+        refreshShader()
+        invalidateSelf()
+    }
+
     /** Updates the highlight color and everything derived from it. */
     private fun applyAccent(color: Int) {
         accentColor = color
