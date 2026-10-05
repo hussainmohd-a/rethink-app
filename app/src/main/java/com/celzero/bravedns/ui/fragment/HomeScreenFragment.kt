@@ -1143,7 +1143,8 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                     // counts are pending, but the RPN stopped flag is
                     // independent of them
                     val stoppedCount =
-                        if (isRpnStoppedEarly()) RpnProxyManager.getEnabledConfigs().size else 0
+                        (if (isRpnStoppedEarly()) RpnProxyManager.getEnabledConfigs().size else 0) +
+                            getStoppedWgCount()
                     uiCtx {
                         b.fhsCardOtherProxyCount.visibility = View.VISIBLE
                         b.fhsCardOtherProxyCount.setTextAnimated(getString(R.string.lbl_checking))
@@ -1172,11 +1173,9 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
 
                 val isBoth = proxies.isNotEmpty() && rpnProxies.isNotEmpty()
 
-                // The "Stopped" slot tracks the RPN alone: while the RPN is
-                // not routing (soft-stopped), every selected RPN server counts
-                // as stopped — even while WireGuard is up.
                 val isRpnStopped = RpnProxyManager.hasValidSubscription() && !RpnProxyManager.isRpnActive()
-                val stoppedCount = if (isRpnStopped) RpnProxyManager.getEnabledConfigs().size else 0
+                val rpnStoppedCount = if (isRpnStopped) RpnProxyManager.getEnabledConfigs().size else 0
+                val stoppedCount = getStoppedWgCount() + rpnStoppedCount
 
                 uiCtx {
                     b.fhsCardOtherProxyCount.visibility = View.VISIBLE
@@ -1200,6 +1199,10 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                     if (isBoth) {
                         b.fhsCardOtherProxyCount.isSelected = true
                         b.fhsCardOtherProxyCount.setTextAnimated(getString(R.string.two_argument, getString(R.string.rpn_title), getString(R.string.lbl_wireguard)))
+                    } else if (rpnProxies.isNotEmpty()) {
+                        b.fhsCardOtherProxyCount.setTextAnimated(getString(R.string.rpn_title))
+                    } else if (proxies.isNotEmpty()) {
+                        b.fhsCardOtherProxyCount.setTextAnimated(getString(R.string.lbl_wireguard))
                     } else {
                         b.fhsCardOtherProxyCount.setTextAnimated(getString(resId))
                     }
@@ -1221,7 +1224,13 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
                 return
             }
             b.fhsCardOtherProxyCount.visibility = View.VISIBLE
-            b.fhsCardOtherProxyCount.setTextAnimated(getString(resId))
+            val headline =
+                if (RpnProxyManager.isRpnActive() && !appConfig.isProxyEnabled()) {
+                    getString(R.string.rpn_title)
+                } else {
+                    getString(resId)
+                }
+            b.fhsCardOtherProxyCount.setTextAnimated(headline)
         }
     }
 
@@ -1502,7 +1511,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
     }
 
     /**
-     * Shows/hides the RPN-only "Stopped" slot (legend column + bar segment).
+     * Shows/hides the "Stopped" slot (legend column + bar segment).
      * Both views toggle together so the remaining bars keep equal widths.
      */
     private fun updateStoppedSlot(show: Boolean) {
@@ -1512,14 +1521,16 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         b.fhsProxyStoppedColumn.isVisible = show
     }
 
-    /**
-     * The "Stopped" slot appears only when RPN is part of the proxy card:
-     * while RPN is routing, or when RPN is stopped but the subscription is
-     * still valid (so the slot can flag "stopped"). It never shows for
-     * WireGuard-only or plain SOCKS5/HTTP proxies.
-     */
+    private fun getStoppedWgCount(): Int {
+        if (WireguardManager.getActiveWgCount() == 0) return 0
+        val stopped = WireguardManager.getNumberOfMappings() - WireguardManager.getActiveWgCount()
+        return stopped.coerceAtLeast(0)
+    }
+
     private fun isStoppedSlotVisible(): Boolean {
-        return RpnProxyManager.isRpnActive() || RpnProxyManager.hasValidSubscription()
+        return RpnProxyManager.isRpnActive() ||
+            RpnProxyManager.hasValidSubscription() ||
+            getStoppedWgCount() > 0
     }
 
     /** True when a valid RPN subscription exists but RPN is not routing. */
