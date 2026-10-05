@@ -48,7 +48,7 @@ object ViewModelModule {
         viewModel { BlockFreeDnsViewModel(get(), get(), get(), get(), get(), get()) }
         viewModel { RethinkLogViewModel(get()) }
         viewModel { AlertsViewModel(get(), get()) }
-        viewModel { ConsoleLogViewModel(get()) }
+        viewModel { ConsoleLogViewModel(get(), get(), get(), get()) }
         viewModel { DomainConnectionsViewModel(get()) }
         viewModel { WgNwActivityViewModel(get()) }
         viewModel { EventsViewModel(get()) }
