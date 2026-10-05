@@ -88,11 +88,8 @@ class TaskerAutomationBottomSheet : BaseBottomSheetDialogFragment() {
     }
 
     private fun savePackages() {
-        val pkgName = normalizePackages(b.taskerPackagesEt.text)
-        if (pkgName == null) {
-            Logger.w(LOG_TAG_UI, "empty trigger packages, ignoring save")
-            return
-        }
+        // blank input intentionally clears the allowlist (blocks all senders)
+        val pkgName = normalizePackages(b.taskerPackagesEt.text) ?: ""
         persistentState.appTriggerPackages = pkgName
         Logger.i(LOG_TAG_UI, "app trigger packages set to $pkgName")
         dismiss()
@@ -102,8 +99,8 @@ class TaskerAutomationBottomSheet : BaseBottomSheetDialogFragment() {
         const val TAG = "TaskerAutomationBottomSheet"
 
         /**
-         * Returns the trimmed, non-empty package list to persist, or null when the
-         * input has nothing to save (blank / whitespace only).
+         * Returns the trimmed package list to persist, or null when the input is
+         * blank / whitespace only (which the caller persists as an empty allowlist).
          */
         fun normalizePackages(raw: CharSequence?): String? {
             return raw?.toString()?.trim()?.takeIf { it.isNotEmpty() }

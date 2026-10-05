@@ -207,7 +207,7 @@ class TaskerAutomationBottomSheetTest {
     }
 
     @Test
-    fun `save with empty input does not persist and keeps sheet open`() {
+    fun `save with empty input persists empty allowlist and dismisses the sheet`() {
         val shown = showSheet() ?: return
         val (activity, sheet) = shown
         val et = sheet.requireView().findViewById<EditText>(R.id.tasker_packages_et)
@@ -216,10 +216,10 @@ class TaskerAutomationBottomSheetTest {
             .findViewById<android.view.View>(R.id.tasker_packages_save_btn)
             .performClick()
 
-        verify(exactly = 0) { mockPersistentState.appTriggerPackages = any() }
+        verify(exactly = 1) { mockPersistentState.appTriggerPackages = "" }
         activity.supportFragmentManager.executePendingTransactions()
-        assertNotNull(
-            "sheet must stay open on empty input",
+        assertNull(
+            "sheet must be dismissed after save",
             activity.supportFragmentManager.findFragmentByTag(TaskerAutomationBottomSheet.TAG)
         )
     }
