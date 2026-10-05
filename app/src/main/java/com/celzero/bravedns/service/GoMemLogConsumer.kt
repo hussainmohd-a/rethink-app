@@ -144,22 +144,25 @@ class GoMemLogConsumer(private val appContext: Context, private val scope: Corou
     }
 
     private suspend fun consumeDrains() {
-        for (msg in drains) {
-            when (msg) {
-                is DrainData -> {
-                    try {
-                        processBuffer(msg.buffer, msg.bytesRead)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        Logger.e(LOG_TAG_BUG_REPORT, "$TAG consumeDrains: processBuffer failed: ${e.message}", e)
+        try {
+            for (msg in drains) {
+                when (msg) {
+                    is DrainData -> {
+                        try {
+                            processBuffer(msg.buffer, msg.bytesRead)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Logger.e(LOG_TAG_BUG_REPORT, "$TAG consumeDrains: processBuffer failed: ${e.message}", e)
+                        }
                     }
-                }
-                DrainClose -> {
-                    closeTombstoneStream()
-                    return
+                    // tombstone teardown is handled by the finally block so it also
+                    // runs when the channel is closed with queued items remaining
+                    DrainClose -> return
                 }
             }
+        } finally {
+            closeTombstoneStream()
         }
     }
 
@@ -221,8 +224,10 @@ class GoMemLogConsumer(private val appContext: Context, private val scope: Corou
     override fun onClose(): Boolean {
         Logger.d(LOG_TAG_BUG_REPORT, "$TAG onClose: scheduling cleanup")
         if (drains.trySend(DrainClose).isFailure) {
-            // queue is gone/full; fall back to a direct teardown task on the processor
-            scope.launch(processor) { closeTombstoneStream() }
+            // queue full: close the channel so the consumer drains remaining queued
+            // work before exiting and tearing down via its finally block; a direct
+            // teardown task here could race ahead of queued drain processing
+            drains.close()
         }
         return false
     }
