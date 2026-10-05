@@ -31,7 +31,7 @@ interface RpnLogDAO {
     @Query("SELECT * FROM RpnLog where id > :lastId LIMIT :limit OFFSET :offset")
     suspend fun getLogsChunked(lastId: Int, limit: Int, offset: Int): List<RpnLog>
 
-    @Query("SELECT * FROM RpnLog WHERE message LIKE :input AND level >= :minLevel ORDER BY timestamp DESC, id ASC LIMIT :limit")
+    @Query("SELECT * FROM RpnLog WHERE message LIKE :input AND level >= :minLevel ORDER BY timestamp DESC, id DESC LIMIT :limit")
     suspend fun getLogsForUi(input: String, minLevel: Int, limit: Int): List<RpnLog>
 
     @Query("select timestamp from RpnLog order by id limit 1")
