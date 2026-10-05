@@ -17,6 +17,7 @@ import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class VpnControlReceiverTest {
@@ -39,11 +40,12 @@ class VpnControlReceiverTest {
         receiver = VpnControlReceiver()
         wgCommands = mockk(relaxed = true)
         receiver.wgCommands = wgCommands
+        // tests drive identity through the seam; spoof-rejection tests restore the default
+        receiver.callerResolver = { _, _ -> "com.trusted.app" }
     }
 
     private fun trustedWgIntent(action: String, wgIds: String?): Intent {
         return Intent(action).apply {
-            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.trusted.app")
             if (wgIds != null) {
                 putExtra(VpnControlReceiver.EXTRA_WG_IDS, wgIds)
             }
@@ -61,9 +63,8 @@ class VpnControlReceiverTest {
     fun `test onReceive with untrusted package`() {
         every { persistentState.appTriggerPackages } returns "com.trusted.app"
         every { persistentState.wgTaskerAutomationEnabled } returns true
-        val intent = Intent(VpnControlReceiver.ACTION_START).apply {
-            putExtra("sender", "com.untrusted.app")
-        }
+        receiver.callerResolver = { _, _ -> "com.untrusted.app" }
+        val intent = Intent(VpnControlReceiver.ACTION_START)
         receiver.onReceive(context, intent)
         // Verify handleVpnStart not called (check logs or internal state if possible)
     }
@@ -152,8 +153,8 @@ class VpnControlReceiverTest {
     fun `wg actions from untrusted sender are ignored`() {
         every { persistentState.appTriggerPackages } returns "com.trusted.app"
         every { persistentState.wgTaskerAutomationEnabled } returns true
+        receiver.callerResolver = { _, _ -> "com.untrusted.app" }
         val intent = Intent(VpnControlReceiver.ACTION_WG_PAUSE).apply {
-            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.untrusted.app")
             putExtra(VpnControlReceiver.EXTRA_WG_IDS, "1")
         }
         receiver.onReceive(context, intent)
@@ -190,11 +191,63 @@ class VpnControlReceiverTest {
     @Test
     fun `unknown action is ignored`() {
         every { persistentState.appTriggerPackages } returns "com.trusted.app"
-        val intent = Intent("com.celzero.bravedns.intent.action.UNKNOWN").apply {
-            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.trusted.app")
-        }
+        val intent = Intent("com.celzero.bravedns.intent.action.UNKNOWN")
         receiver.onReceive(context, intent)
         coVerify(exactly = 0) { wgCommands.pause(any()) }
         assertTrue("unknown action must be a no-op", true)
+    }
+
+    // ── caller identity resolution ───────────────────────────────────────────
+
+    @Test
+    fun `default resolver ignores spoofed sender extra and rejects when os identity is absent`() {
+        every { persistentState.appTriggerPackages } returns "com.trusted.app"
+        every { persistentState.wgTaskerAutomationEnabled } returns true
+        receiver.callerResolver = { c, i -> receiver.defaultCallerResolver(c, i) }
+        val intent = Intent(VpnControlReceiver.ACTION_WG_PAUSE).apply {
+            // spoofed extra naming an allowlisted package must not grant trust
+            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.trusted.app")
+            putExtra(VpnControlReceiver.EXTRA_WG_IDS, "1")
+        }
+        receiver.onReceive(context, intent)
+        coVerify(exactly = 0) { wgCommands.pause(any()) }
+    }
+
+    @Test
+    fun `default resolver returns null on spoofed extra when no os identity is stamped`() {
+        val intent = Intent(VpnControlReceiver.ACTION_STOP).apply {
+            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.trusted.app")
+        }
+        // on the Robolectric SDK no OS sender identity is stamped; the spoofed extra must not
+        // be honored even though it names an allowlisted package
+        val resolved = receiver.defaultCallerResolver(context, intent)
+        assertEquals(null, resolved)
+    }
+
+    @Test
+    @Config(sdk = [33])
+    fun `default resolver honors legacy sender extra below android 14`() {
+        every { persistentState.appTriggerPackages } returns "com.trusted.app"
+        every { persistentState.wgTaskerAutomationEnabled } returns true
+        // SDK 33 exercises the real isAtleastU() gate: below Android 14 the legacy
+        // "sender" extra convention is still honored
+        receiver.callerResolver = { c, i -> receiver.defaultCallerResolver(c, i) }
+        val intent = Intent(VpnControlReceiver.ACTION_WG_PAUSE).apply {
+            putExtra(VpnControlReceiver.EXTRA_SENDER, "com.trusted.app")
+            putExtra(VpnControlReceiver.EXTRA_WG_IDS, "1")
+        }
+        receiver.onReceive(context, intent)
+        coVerify(exactly = 1) { wgCommands.pause(listOf(1)) }
+    }
+
+    @Test
+    fun `wg pause with allowlisted identity via seam dispatches`() {
+        every { persistentState.appTriggerPackages } returns "com.trusted.app"
+        every { persistentState.wgTaskerAutomationEnabled } returns true
+        val intent = Intent(VpnControlReceiver.ACTION_WG_PAUSE).apply {
+            putExtra(VpnControlReceiver.EXTRA_WG_IDS, "1, 3")
+        }
+        receiver.onReceive(context, intent)
+        coVerify(exactly = 1) { wgCommands.pause(listOf(1, 3)) }
     }
 }

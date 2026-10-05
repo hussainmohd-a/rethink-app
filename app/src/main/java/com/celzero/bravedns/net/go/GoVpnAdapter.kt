@@ -35,6 +35,7 @@ import com.celzero.bravedns.data.AppConfig.Companion.DOH_INDEX
 import com.celzero.bravedns.data.AppConfig.Companion.DOT_INDEX
 import com.celzero.bravedns.data.AppConfig.Companion.BOOTSTRAP_DNS_IF_NET_DNS_EMPTY
 import com.celzero.bravedns.data.AppConfig.TunnelOptions
+import com.celzero.bravedns.data.SsidItem
 import com.celzero.bravedns.database.ConnectionTrackerRepository
 import com.celzero.bravedns.database.CountryConfig
 import com.celzero.bravedns.database.DnsCryptRelayEndpoint
@@ -1519,7 +1520,18 @@ class GoVpnAdapter : KoinComponent {
         isMobileActive: Boolean,
         ssid: String
     ) {
+        // when external wireguard automation is enabled, the network
+        // observer must not pause/resume wg proxies, or it would undo tasker's state,
+        // see VpnControlReceiver
+        val wgTaskerOwned = persistentState.wgTaskerAutomationEnabled
+        if (wgTaskerOwned) {
+            Logger.i(
+                LOG_TAG_VPN,
+                "$TAG wg tasker automation enabled, skipping network-driven wg pause/resume"
+            )
+        }
         wgConfigs.forEach {
+            if (wgTaskerOwned) return@forEach
             val id = ID_WG_BASE + it.getId()
             val files = WireguardManager.getConfigFilesById(it.getId())
             // if the proxy is one-wg then mobile-only/ssid automaton doesn't apply
@@ -1529,7 +1541,8 @@ class GoVpnAdapter : KoinComponent {
 
             val useOnlyOnSsid = files?.ssidEnabled == true && !files.oneWireGuard
             val configuredSsids = files?.ssids.orEmpty()
-            val ssidMatch = WireguardManager.matchesSsidList(configuredSsids, ssid) && ssid.isNotEmpty()
+            val ssidMatch = SsidItem.parseStorageList(configuredSsids).isEmpty() ||
+                (ssid.isNotEmpty() && WireguardManager.matchesSsidList(configuredSsids, ssid))
             val canResumeSsidWg = useOnlyOnSsid && ssidMatch
 
             val canResume = canResumeMobileWg || canResumeSsidWg
@@ -1612,7 +1625,8 @@ class GoVpnAdapter : KoinComponent {
 
             val useOnlyOnSsid = automationConfig?.ssidBased == true
             val configuredSsids = automationConfig?.ssids.orEmpty()
-            val ssidMatch = RpnProxyManager.matchesSsidList(configuredSsids, ssid) && ssid.isNotEmpty()
+            val ssidMatch = SsidItem.parseStorageList(configuredSsids).isEmpty() ||
+                (ssid.isNotEmpty() && RpnProxyManager.matchesSsidList(configuredSsids, ssid))
             val canResumeSsidWg = useOnlyOnSsid && ssidMatch
 
             val canResume = canResumeMobileWg || canResumeSsidWg
@@ -3052,6 +3066,23 @@ class GoVpnAdapter : KoinComponent {
             Logger.w(LOG_TAG_PROXY, "$TAG err get active entitlement from: ${e.message}")
             return null
         }
+    }
+
+    suspend fun rpnRemoteService() {
+        if (!tunnel.isConnected) {
+            Logger.e(LOG_TAG_VPN, "$TAG no tunnel, skip set experimental settings")
+            return
+        }
+
+        val server = tunnel.services?.addServer("", "", "")
+        val bri = tunnel.services?.bridge(server?.id(), "wg1-id")
+        // server?.hop() does the same thing as bridge but requires object
+        // remove the server
+        tunnel.services?.removeServer(server?.id())
+        // remove the bridge
+        tunnel.services?.bridge(server?.id(), "")
+
+        server?.status()
     }
 
     suspend fun getWinByKey(key: String): Proxy? {

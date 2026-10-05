@@ -436,6 +436,9 @@ class PersistentState(context: Context) : SimpleKrate(context), KoinComponent {
     // user setting to allow only added packages can trigger the app
     var appTriggerPackages by stringPref("app_trigger_packages").withDefault<String>("")
 
+    // external automation for wireguard related actions (via broadcasts)
+    var wgTaskerAutomationEnabled by booleanPref("wg_tasker_automation_enabled").withDefault<Boolean>(false)
+
     // perform auto or manual network connectivity checks
     var performAutoNetworkConnectivityChecks by booleanPref("perform_auto_network_connectivity_checks").withDefault<Boolean>(true)
 
