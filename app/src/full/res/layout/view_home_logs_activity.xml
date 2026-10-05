@@ -19,14 +19,14 @@
 
         <LinearLayout
             android:id="@+id/fhs_logs_allowed_header"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_marginEnd="24dp"
             android:orientation="vertical">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/fhs_card_allowed_logs_count"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:fontFamily="monospace"
@@ -41,7 +41,7 @@
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/fhs_card_allowed_logs_label"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:alpha="0.8"
                 android:ellipsize="end"
@@ -55,15 +55,14 @@
 
         <LinearLayout
             android:id="@+id/fhs_logs_blocked_header"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
-            android:layout_weight="1"
             android:orientation="vertical">
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/fhs_card_blocked_logs_count"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
                 android:fontFamily="monospace"
@@ -78,7 +77,7 @@
 
             <androidx.appcompat.widget.AppCompatTextView
                 android:id="@+id/fhs_card_blocked_logs_label"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:alpha="0.8"
                 android:ellipsize="end"
