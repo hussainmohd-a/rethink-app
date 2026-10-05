@@ -1005,24 +1005,22 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
                 return@io
             }
 
-            // checks if the config's keys are already in use by another active config
+            // key overlap is a warning now: the user can proceed or keep catch-all disabled
             if (enabled && !WireguardManager.canEnableProxy(configId)) {
                 Logger.i(
                     LOG_TAG_PROXY,
-                    "wg keys overlap with an active config, cannot enable, id: $configId"
+                    "wg keys overlap with an active config, id: $configId"
                 )
-                uiCtx {
-                    // reset the check box
-                    b.catchAllCheck.isChecked = false
-                    Utilities.showToastUiCentered(
-                        this,
-                        getString(R.string.wireguard_duplicate_keys_conflict),
-                        Toast.LENGTH_LONG
-                    )
-                }
+                uiCtx { showDuplicateKeysWarningDialog { applyCatchAll(enabled) } }
                 return@io
             }
 
+            applyCatchAll(enabled)
+        }
+    }
+
+    private fun applyCatchAll(enabled: Boolean) {
+        io {
             WireguardManager.updateCatchAllConfig(configId, enabled)
             logEvent(
                 "WireGuard Catch All apps",
@@ -1038,6 +1036,24 @@ class WgConfigDetailActivity : BaseActivity(R.layout.activity_wg_detail) {
                 }
             }
         }
+    }
+
+    // Warns that the config's keys are already in use by another active config.
+    // Proceed enables catch-all anyway; OK keeps it disabled.
+    private fun showDuplicateKeysWarningDialog(onProceed: () -> Unit) {
+        if (isFinishing) return
+        val builder = MaterialAlertDialogBuilder(this, R.style.App_Dialog_NoDim)
+        builder.setTitle(getString(R.string.wireguard_duplicate_keys_warning_title))
+        builder.setMessage(getString(R.string.wireguard_duplicate_keys_warning))
+        builder.setCancelable(true)
+        builder.setPositiveButton(getString(R.string.dns_info_positive)) { dialog, _ ->
+            b.catchAllCheck.isChecked = false
+            dialog.dismiss()
+        }
+        builder.setNeutralButton(getString(R.string.lbl_proceed)) { _, _ -> onProceed() }
+        val dialog = builder.create()
+        dialog.setOnCancelListener { b.catchAllCheck.isChecked = false }
+        dialog.show()
     }
 
     private fun openAppsDialog(proxyName: String) {

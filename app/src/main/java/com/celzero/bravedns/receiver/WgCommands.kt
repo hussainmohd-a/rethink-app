@@ -39,9 +39,6 @@ enum class WgCommandError(val msgRes: Int) {
     /** Another one-wireguard config is active. */
     ONE_WG_ACTIVE(R.string.wireguard_one_wg_active_conflict),
 
-    /** Config keys overlap with another active config. */
-    KEY_OVERLAP(R.string.wireguard_duplicate_keys_conflict),
-
     /** Config missing, invalid, or not active (for pause/resume). */
     INVALID_CONFIG(R.string.wireguard_invalid_config_message),
 
@@ -140,10 +137,12 @@ class WgCommands {
             Logger.w(LOG_TAG_VPN, "$TAG start: one-wg already enabled, cannot enable wg $id")
             return Failure(id, WgCommandError.ONE_WG_ACTIVE)
         }
-        // checks if the config's keys are already in use by another active config
+        // key overlap is a warning only: log it and allow the enable to proceed
         if (!WireguardManager.canEnableProxy(id)) {
-            Logger.w(LOG_TAG_VPN, "$TAG start: wg keys overlap with an active config, id: $id")
-            return Failure(id, WgCommandError.KEY_OVERLAP)
+            Logger.w(
+                LOG_TAG_VPN,
+                "$TAG start: wg keys overlap with an active config, allowing anyway, id: $id"
+            )
         }
         WireguardManager.enableConfig(mapping)
         Logger.i(LOG_TAG_VPN, "$TAG started wg config: $id, ${mapping.name}")

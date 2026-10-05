@@ -738,24 +738,48 @@ class WgConfigAdapter(private val context: Context, private val listener: DnsSta
                 return
             }
 
-            // checks if the config's keys are already in use by another active config
+            // key overlap is a warning now: the user can proceed or keep the config disabled
             if (!WireguardManager.canEnableProxy(cfg.id)) {
                 Logger.i(LOG_TAG_PROXY, "$TAG wg keys overlap with an active config: ${cfg.id}")
-                uiCtx {
-                    // reset the check box
-                    b.interfaceSwitch.isChecked = false
-                    Utilities.showToastUiCentered(
-                        context,
-                        context.getString(R.string.wireguard_duplicate_keys_conflict),
-                        Toast.LENGTH_LONG
-                    )
-                }
+                uiCtx { showDuplicateKeysWarningDialog { io { enableWg(cfg) } } }
                 return
             }
 
+            enableWg(cfg)
+        }
+
+        private suspend fun enableWg(cfg: WgConfigFilesImmutable) {
             WireguardManager.enableConfig(cfg)
             logEvent("Wireguard enable", "Enabled WireGuard config: ${cfg.name} (id: ${cfg.id})")
             uiCtx { listener.onDnsStatusChanged() }
+        }
+
+        // Warns that the config's keys are already in use by another active config.
+        // Proceed enables the config anyway; OK keeps it disabled.
+        private fun showDuplicateKeysWarningDialog(onProceed: () -> Unit) {
+            val ctx = context
+            if (ctx is android.app.Activity && !ctx.isFinishing) {
+                val dialog = MaterialAlertDialogBuilder(ctx, R.style.App_Dialog_NoDim)
+                    .setTitle(R.string.wireguard_duplicate_keys_warning_title)
+                    .setMessage(R.string.wireguard_duplicate_keys_warning)
+                    .setCancelable(true)
+                    .setPositiveButton(R.string.dns_info_positive) { d, _ ->
+                        b.interfaceSwitch.isChecked = false
+                        d.dismiss()
+                    }
+                    .setNeutralButton(R.string.lbl_proceed) { _, _ -> onProceed() }
+                    .create()
+                dialog.setOnCancelListener { b.interfaceSwitch.isChecked = false }
+                dialog.show()
+            } else {
+                // no activity context: fall back to keeping the config disabled
+                b.interfaceSwitch.isChecked = false
+                Utilities.showToastUiCentered(
+                    context,
+                    context.getString(R.string.wireguard_duplicate_keys_warning),
+                    Toast.LENGTH_LONG
+                )
+            }
         }
 
         // Shows an "invalid config" AlertDialog when an Activity context is

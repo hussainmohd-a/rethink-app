@@ -20,6 +20,7 @@ import com.celzero.bravedns.service.VpnController
 import com.celzero.bravedns.service.WireguardManager
 import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -119,17 +120,19 @@ class WgCommandsTest {
     }
 
     @Test
-    fun `start with overlapping keys reports KEY_OVERLAP`() = runTest {
+    fun `start with overlapping keys is allowed with a warning`() = runTest {
         every { WireguardManager.getConfigFilesById(1) } returns mapping(1)
         every { VpnController.hasTunnel() } returns true
         every { WireguardManager.canEnableProxy() } returns true
         every { WireguardManager.isValidConfig(1) } returns true
         every { WireguardManager.oneWireGuardEnabled() } returns false
         every { WireguardManager.canEnableProxy(1) } returns false
+        coEvery { WireguardManager.enableConfig(any()) } just Runs
 
         val failures = commands.start(listOf(1))
 
-        assertEquals(listOf(WgCommands.Failure(1, WgCommandError.KEY_OVERLAP)), failures)
+        assertTrue(failures.isEmpty())
+        coVerify { WireguardManager.enableConfig(any()) }
     }
 
     @Test
@@ -158,7 +161,7 @@ class WgCommandsTest {
 
     @Test
     fun `start batching reports per-config failures without aborting`() = runTest {
-        // id 1: missing config; id 2: success; id 3: key overlap
+        // id 1: missing config; id 2: success; id 3: key overlap warning, still enabled
         every { WireguardManager.getConfigFilesById(1) } returns null
         every { WireguardManager.getConfigFilesById(2) } returns mapping(2)
         every { WireguardManager.getConfigFilesById(3) } returns mapping(3)
@@ -174,10 +177,7 @@ class WgCommandsTest {
         val failures = commands.start(listOf(1, 2, 3))
 
         assertEquals(
-            listOf(
-                WgCommands.Failure(1, WgCommandError.INVALID_CONFIG),
-                WgCommands.Failure(3, WgCommandError.KEY_OVERLAP)
-            ),
+            listOf(WgCommands.Failure(1, WgCommandError.INVALID_CONFIG)),
             failures
         )
     }
