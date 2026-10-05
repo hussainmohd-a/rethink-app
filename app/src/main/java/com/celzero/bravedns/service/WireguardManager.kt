@@ -402,10 +402,11 @@ object WireguardManager : KoinComponent {
                 if (active.getId() == id) return@any false
                 val activePrivateKey =
                     active.getInterface()?.getKeyPair()?.getPrivateKey()?.base64()
-                if (privateKey != null && activePrivateKey == privateKey) return@any true
+                val privateKeyMatches = privateKey != null && activePrivateKey == privateKey
                 val activePeerKeys =
                     active.getPeers()?.map { it.getPublicKey().base64() }?.toSet() ?: emptySet()
-                peerKeys.any { it in activePeerKeys }
+                val peerKeyMatches = peerKeys.any { it in activePeerKeys }
+                privateKeyMatches && peerKeyMatches
             }
             if (duplicate) {
                 Logger.i(
