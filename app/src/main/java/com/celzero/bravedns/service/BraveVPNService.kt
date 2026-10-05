@@ -72,6 +72,7 @@ import com.celzero.bravedns.database.AppInfo
 import com.celzero.bravedns.database.ConnectionTracker
 import com.celzero.bravedns.database.ConnectionTrackerRepository
 import com.celzero.bravedns.database.ConsoleLog
+import com.celzero.bravedns.database.RpnLog
 import com.celzero.bravedns.database.CountryConfig
 import com.celzero.bravedns.database.EventSource
 import com.celzero.bravedns.database.EventType
@@ -4021,6 +4022,10 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Network
     }
 
     suspend fun pauseMobileOnlyWireGuardOnNoNw() {
+        if (persistentState.wgTaskerAutomationEnabled) {
+            // wg automation is owned by an external app (tasker et al), see VpnControlReceiver
+            return
+        }
         val activeWgs = WireguardManager.getActiveConfigs()
         activeWgs.forEach { config ->
             val map = WireguardManager.getConfigFilesById(config.getId())
@@ -4037,6 +4042,10 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Network
     }
 
     suspend fun pauseSsidEnabledWireGuardOnNoNw() {
+        if (persistentState.wgTaskerAutomationEnabled) {
+            // wg automation is owned by an external app (tasker et al), see VpnControlReceiver
+            return
+        }
         val activeWgs = WireguardManager.getActiveConfigs()
         activeWgs.forEach { config ->
             val map = WireguardManager.getConfigFilesById(config.getId())
@@ -4050,6 +4059,16 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Network
             // pause the wireguard proxy, so that it won't be used for new connections
             vpnAdapter?.pauseWireguard(id)
         }
+    }
+
+    suspend fun pauseWireGuardProxy(id: String) {
+        logd("pause wg from tunnel (external): $id")
+        vpnAdapter?.pauseWireguard(id)
+    }
+
+    suspend fun resumeWireGuardProxy(id: String) {
+        logd("resume wg from tunnel (external): $id")
+        vpnAdapter?.resumeWireguard(id)
     }
 
     suspend fun refreshOrPauseOrResumeOrReAddProxies() {
@@ -4273,6 +4292,10 @@ class BraveVPNService : VpnService(), ConnectionMonitor.NetworkListener, Network
 
     fun writeConsoleLog(log: ConsoleLog) {
         netLogTracker.writeConsoleLog(log)
+    }
+
+    fun writeRpnLog(log: RpnLog) {
+        netLogTracker.writeRpnLog(log)
     }
 
     suspend fun isRpnReachable(csv: String): Boolean { // can be ippcsv or hostpcsv

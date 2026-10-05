@@ -1971,9 +1971,37 @@
 
         Supported actions:\n
         • Start VPN – com.celzero.bravedns.intent.action.VPN_START\n
-        • Stop VPN – com.celzero.bravedns.intent.action.VPN_STOP
+        • Stop VPN – com.celzero.bravedns.intent.action.VPN_STOP\n\n
+
+        WireGuard actions (require the WireGuard automation toggle above;\n
+        extra key: "wg_ids" – comma separated WireGuard config ids, e.g. "1,3"):\n
+        • Start WireGuard – com.celzero.bravedns.intent.action.WG_START\n
+        • Stop WireGuard – com.celzero.bravedns.intent.action.WG_STOP\n
+        • Pause WireGuard – com.celzero.bravedns.intent.action.WG_PAUSE\n
+        • Resume WireGuard – com.celzero.bravedns.intent.action.WG_RESUME
     </string>
     <string name="adv_tasker_dialog_edit_hint" translatable="true">Enter package name (example: net.dinglisch.android.taskerm)</string>
+
+    <string name="tasker_allowed_apps_title" translatable="true">Allowed apps</string>
+    <string name="tasker_intent_reference_title" translatable="true">Intent reference</string>
+    <string name="tasker_wg_automation_title" translatable="true">WireGuard automation</string>
+    <string name="tasker_wg_automation_desc" translatable="true">Allow trusted apps to start, stop, pause and resume WireGuard configs by id. While enabled, in-app WireGuard automation (mobile-only / SSID) is controlled by the external app instead.</string>
+    <string name="wg_automation_tasker_managed" translatable="true">Managed by an external app (e.g. Tasker). In-app automation is disabled for this config.</string>
+
+    <string name="notif_channel_wg_automation" translatable="true">WireGuard automation</string>
+    <string name="notif_channel_desc_wg_automation" translatable="true">Alerts when an external automation app could not start, stop, pause or resume WireGuard</string>
+    <string name="wg_automation_notif_title" translatable="true">WireGuard automation</string>
+    <plurals name="wg_automation_notif_summary">
+        <item quantity="one">Couldn\'t %1$s %2$d of %3$d WireGuard config</item>
+        <item quantity="other">Couldn\'t %1$s %2$d of %3$d WireGuard configs</item>
+    </plurals>
+    <string name="wg_automation_notif_item" translatable="true">Config #%1$d: %2$s</string>
+    <string name="wg_automation_notif_more" translatable="true">…and %1$d more</string>
+    <string name="wg_automation_action_start" translatable="true">start</string>
+    <string name="wg_automation_action_stop" translatable="true">stop</string>
+    <string name="wg_automation_action_pause" translatable="true">pause</string>
+    <string name="wg_automation_action_resume" translatable="true">resume</string>
+    <string name="wg_automation_action_failed" translatable="true">Action failed, try again</string>
 
     <string name="set_auto_dial_title" translatable="false">Set Auto Dial</string>
     <string name="set_auto_dial_desc" translatable="false">Use parallel dialing to connect to multiple servers at once.</string>
@@ -2370,10 +2398,6 @@
     <string name="no_internet_purchase_msg" translatable="false">No internet connection. Please check your connection and try again.</string>
 
     <!-- Grace / OnHold banner -->
-
-    <!-- Account mismatch -->
-    <string name="account_mismatch_title" translatable="false">Different Google Account Detected</string>
-    <string name="account_mismatch_msg" translatable="false">You purchased with a different Google account. Please switch accounts in Google Play to restore your purchase.</string>
 
     <!-- User-friendly billing error messages -->
     <string name="billing_err_service_unavailable" translatable="false">Google Play is temporarily unavailable. Please try again in a few minutes.</string>
