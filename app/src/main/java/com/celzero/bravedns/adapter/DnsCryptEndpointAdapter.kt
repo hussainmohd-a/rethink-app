@@ -206,10 +206,12 @@ class DnsCryptEndpointAdapter(private val context: Context, private val appConfi
             if (endpoint.isSelected && VpnController.hasTunnel() && !appConfig.isSmartDnsEnabled()) {
                 registerForStatusUpdates(this)
             } else if (endpoint.isSelected) {
+                statusHolders.remove(this)
                 b.dnsCryptEndpointListUrlExplanation.text =
                     context.getString(R.string.rt_filter_parent_selected)
                 b.dnsCryptEndpointListUrlExplanation.visibility = View.VISIBLE
             } else {
+                statusHolders.remove(this)
                 b.dnsCryptEndpointListUrlExplanation.text = ""
                 b.dnsCryptEndpointListUrlExplanation.visibility = View.GONE
             }

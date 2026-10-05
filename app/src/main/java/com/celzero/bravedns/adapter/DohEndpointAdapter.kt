@@ -204,9 +204,11 @@ class DohEndpointAdapter(private val context: Context, private val appConfig: Ap
             if (endpoint.isSelected && VpnController.hasTunnel() && !appConfig.isSmartDnsEnabled()) {
                 registerForStatusUpdates(this)
             } else if (endpoint.isSelected) {
+                statusHolders.remove(this)
                 b.endpointDesc.text = context.getString(R.string.rt_filter_parent_selected)
                 b.endpointDesc.visibility = View.VISIBLE
             } else {
+                statusHolders.remove(this)
                 b.endpointDesc.text = ""
                 b.endpointDesc.visibility = View.GONE
             }

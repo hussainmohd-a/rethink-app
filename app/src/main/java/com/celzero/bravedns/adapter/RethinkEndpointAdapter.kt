@@ -234,10 +234,12 @@ class RethinkEndpointAdapter(private val context: Context, private val appConfig
             if (endpoint.isActive && VpnController.hasTunnel() && !appConfig.isSmartDnsEnabled()) {
                 registerForStatusUpdates(this)
             } else if (endpoint.isActive) {
+                statusHolders.remove(this)
                 b.rethinkEndpointListUrlExplanation.text =
                     context.getString(R.string.rt_filter_parent_selected)
                 b.rethinkEndpointListUrlExplanation.visibility = View.VISIBLE
             } else {
+                statusHolders.remove(this)
                 b.rethinkEndpointListUrlExplanation.text = ""
                 b.rethinkEndpointListUrlExplanation.visibility = View.GONE
             }
