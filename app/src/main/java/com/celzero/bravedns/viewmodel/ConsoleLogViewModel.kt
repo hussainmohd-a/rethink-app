@@ -122,17 +122,11 @@ class ConsoleLogViewModel(
             rpnDao.getLogsForUi(input, params.minLevel, MAX_UI_LOG_ROWS)
         }
 
-        // Both lists arrive pre-sorted newest-first in UI ids (console: id DESC;
-        // rpn: id ASC == negated-id DESC), so a linear merge replaces the former
-        // 2 x MAX_UI_LOG_ROWS sort. Equivalent to the previous full sort with
-        // compareByDescending(timestamp).thenByDescending(id).
         val rpnAsConsole = rpn.map { it.toConsoleLog() }
         val merged = mergeNewestFirst(console, rpnAsConsole)
         return PagingData.from(merged)
     }
 
-    // Merges two lists, each sorted by (timestamp DESC, id DESC), into one list with the
-    // same ordering. Ties go to the console list, matching the previous stable sort.
     private fun mergeNewestFirst(a: List<ConsoleLog>, b: List<ConsoleLog>): List<ConsoleLog> {
         val merged = ArrayList<ConsoleLog>(a.size + b.size)
         var i = 0
