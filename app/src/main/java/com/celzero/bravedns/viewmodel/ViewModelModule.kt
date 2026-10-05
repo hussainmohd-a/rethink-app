@@ -36,7 +36,7 @@ object ViewModelModule {
         viewModel { AppCustomIpViewModel(get()) }
         viewModel { RethinkRemoteFileTagViewModel(get()) }
         viewModel { RethinkLocalFileTagViewModel(get()) }
-        viewModel { AppConnectionsViewModel(get(), get(), get()) }
+        viewModel { AppConnectionsViewModel(get(), get(), get(), get()) }
         viewModel { SummaryStatisticsViewModel(get(), get()) }
         viewModel { DetailedStatisticsViewModel(get(), get()) }
         viewModel { LocalBlocklistPacksMapViewModel(get()) }

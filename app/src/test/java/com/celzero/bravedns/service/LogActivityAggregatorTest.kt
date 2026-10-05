@@ -433,6 +433,64 @@ class LogActivityAggregatorTest {
     }
 
     @Test
+    fun `force restore rebuilds from the database even when the wall is live`() = runTest {
+        // log-deletion flow: after rows are removed the database is
+        // authoritative again, so the rebuild must bypass the "wall is live"
+        // guard that a plain restore uses to protect unflushed arrivals
+        val (rangeStart, rangeEnd) = restoreRange()
+        coEvery {
+            dnsRepo.getActivityBuckets(rangeStart, rangeEnd, BUCKET_MS)
+        } returns listOf(ActivityBucketRow(72L, 1, 5))
+
+        val agg = aggregator()
+        // applied (but unflushed) arrival keeps the wall live: a plain
+        // restore keeps the event instead of rebuilding
+        agg.record(listOf(LogActivityEvent(minutesAgoMs(5), LogActivitySource.DNS, blocked = true)))
+        agg.restoreFromDatabase()
+        assertEquals(1L, at(agg.activity.value, 5).blocked)
+
+        agg.forceRestoreFromDatabase()
+
+        // snapshot is published immediately, without waiting for the
+        // coalescing window
+        val s = agg.activity.value
+        assertEquals(5L, s.intervals[72].dnsBlocked)
+        // documented trade-off: the unflushed arrival is wiped by the rebuild
+        // and will not re-record (dedupe)
+        assertEquals(0L, at(s, 5).blocked)
+        assertEquals(5L, s.intervals.sumOf { it.blocked })
+        org.junit.Assert.assertFalse(agg.isStale())
+    }
+
+    @Test
+    fun `force restore applies arrivals queued behind the rebuild exactly once`() = runTest {
+        val (rangeStart, rangeEnd) = restoreRange()
+        val agg = aggregator()
+
+        // enqueue an arrival from inside the rebuild's own db query: the
+        // consumer wakes up while the mutex is held by the forced restore, so
+        // it suspends and must be applied after the rebuild, not wiped by it
+        coEvery {
+            dnsRepo.getActivityBuckets(rangeStart, rangeEnd, BUCKET_MS)
+        } coAnswers {
+            agg.recordOnArrival(
+                LogActivityEvent(minutesAgoMs(5), LogActivitySource.NETWORK, blocked = true, key = "q")
+            )
+            listOf(ActivityBucketRow(72L, 1, 5))
+        }
+
+        agg.forceRestoreFromDatabase()
+        testScheduler.advanceUntilIdle()
+        flushPendingSnapshot()
+
+        val s = agg.activity.value
+        assertEquals(5L, s.intervals[72].dnsBlocked)
+        assertEquals(1L, at(s, 5).networkBlocked)
+        assertEquals(6L, s.intervals.sumOf { it.blocked })
+        org.junit.Assert.assertFalse(agg.isStale())
+    }
+
+    @Test
     fun `blocked to allowed reclassification moves the count`() = runTest {
         val agg = aggregator()
         val e = LogActivityEvent(minutesAgoMs(35), LogActivitySource.DNS, blocked = true)

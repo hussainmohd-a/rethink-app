@@ -398,6 +398,17 @@ class LogActivityAggregator(
         return restoredForBucketStart != bucketFloor(clock.millis())
     }
 
+    /**
+     * Rebuilds the wall from the databases regardless of the wall is live
+     */
+    suspend fun forceRestoreFromDatabase() {
+        mutex.withLock {
+            hasRecordedSinceRestore = false
+            restoredForBucketStart = Long.MIN_VALUE
+        }
+        restoreFromDatabase()
+    }
+
     private var loaded: Boolean = false
 
     private fun shouldRecord(event: LogActivityEvent): Boolean {

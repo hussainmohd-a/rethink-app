@@ -2831,6 +2831,7 @@ class HomeScreenFragment : Fragment(R.layout.fragment_home_screen) {
         handleShimmer()
         maybeAutoStartVpn()
         updateCardsUi()
+        refreshTopAppsHistogram(force = true)
         syncDnsStatus()
         handleLockdownModeIfNeeded()
         startTrafficStats()
