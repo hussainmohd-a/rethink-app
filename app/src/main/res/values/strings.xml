@@ -1819,7 +1819,8 @@
     <string name="wireguard_enabled_failure" translatable="true">Stop other active proxies to enable WireGuard</string>
     <string name="wireguard_dns_mode_conflict" translatable="true">WireGuard cannot be enabled in DNS-only mode. Switch to Firewall or DNS+Firewall mode.</string>
     <string name="wireguard_one_wg_active_conflict" translatable="true">An active One-WireGuard configuration is in use. Disable it first to use individual WireGuard configurations.</string>
-    <string name="wireguard_duplicate_keys_conflict" translatable="true">Cannot enable this WireGuard. Its keys are already in use by another active WireGuard.</string>
+    <string name="wireguard_duplicate_keys_warning_title" translatable="true">Duplicate WireGuard keys</string>
+    <string name="wireguard_duplicate_keys_warning" translatable="true">This WireGuard\'s keys are already in use by another active WireGuard. Proceeding may cause connectivity issues for both configurations.</string>
     <string name="wireguard_invalid_config_title" translatable="true">Invalid WireGuard configuration</string>
     <string name="wireguard_invalid_config_message" translatable="true">The selected WireGuard configuration is invalid or missing. Edit or re-import the configuration and try again.</string>
     <string name="wireguard_replaced_active_config" translatable="true">Replaced the previously active WireGuard configuration</string>
@@ -2725,6 +2726,10 @@
     <string name="rpn_cta_get_plus" translatable="false">Get Rethink+</string>
     <string name="rpn_no_purchase_subtitle" translatable="false">You don\u2019t have a plan yet. Explore private network servers.</string>
     <string name="rpn_unavailable_without_plan" translatable="false">Available with an active plan</string>
+
+    <!-- Already-ended purchase (RethinkPlusManagePurchaseFragment cancel/revoke failure reconcile) -->
+    <string name="rpn_purchase_already_ended_title" translatable="false">Purchase is no longer active</string>
+    <string name="rpn_purchase_already_ended_message" translatable="false">This purchase has already expired or been canceled, so no further action is needed. If you believe this is incorrect, you can manage your purchase on Google Play or contact support for help.</string>
 
     <!-- RethinkPlusFragment connection info -->
     <string name="connection_location_with_colo" translatable="false">%1$s \u2022 %2$s</string>
