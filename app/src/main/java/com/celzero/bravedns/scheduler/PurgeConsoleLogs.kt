@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.celzero.bravedns.database.ConsoleLogRepository
+import com.celzero.bravedns.database.RpnLogRepository
 import com.celzero.bravedns.net.go.GoVpnAdapter
 import com.celzero.bravedns.service.PersistentState
 import org.koin.core.component.KoinComponent
@@ -16,6 +17,7 @@ class PurgeConsoleLogs(val context: Context, workerParameters: WorkerParameters)
     CoroutineWorker(context, workerParameters), KoinComponent {
 
     private val consoleLogRepository by inject<ConsoleLogRepository>()
+    private val rpnLogRepository by inject<RpnLogRepository>()
     private val persistentState by inject<PersistentState>()
     companion object {
         const val MAX_TIME: Long = 3 // max time in hours to keep the console logs
@@ -27,6 +29,8 @@ class PurgeConsoleLogs(val context: Context, workerParameters: WorkerParameters)
         val time = currTime - threshold
 
         consoleLogRepository.deleteOldLogs(time)
+        // rpn logs share the same retention policy as console logs
+        rpnLogRepository.deleteOldLogs(time)
         val startTime = consoleLogRepository.consoleLogStartTimestamp
         val lapsedTime = currTime - startTime
         // stop the console log if it exceeds max time and set the log level to ERROR
