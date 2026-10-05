@@ -147,17 +147,20 @@ class VpnControlReceiver: BroadcastReceiver(), KoinComponent {
         Logger.i(LOG_TAG_VPN, "$TAG handling ${intent.action} for wg ids: $ids")
         // wg commands touch the db + go backend, run them off the main thread; goAsync-style
         // correctness is not critical here as the commands are idempotent
+        val pendingResult = goAsync()
         appScope.launch {
-            val failures = when (intent.action) {
-                ACTION_WG_START -> wgCommands.start(ids)
-                ACTION_WG_STOP -> wgCommands.stop(ids)
-                ACTION_WG_PAUSE -> wgCommands.pause(ids)
-                ACTION_WG_RESUME -> wgCommands.resume(ids)
-                else -> emptyList()
+            try {
+                val failures = when (intent.action) {
+                    ACTION_WG_START -> wgCommands.start(ids)
+                    ACTION_WG_STOP -> wgCommands.stop(ids)
+                    ACTION_WG_PAUSE -> wgCommands.pause(ids)
+                    ACTION_WG_RESUME -> wgCommands.resume(ids)
+                    else -> emptyList()
+                }
+                WgAutomationNotifier.onCommandResult(context, intent.action, ids.size, failures)
+            } finally {
+                pendingResult.finish()
             }
-            // surface partial failures as a single (replaced) notification; a fully
-            // successful command clears any stale failure notification
-            WgAutomationNotifier.onCommandResult(context, intent.action, ids.size, failures)
         }
     }
 
